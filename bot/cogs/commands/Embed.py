@@ -4,9 +4,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from utils.Tools import *
 from utils.emoji import CROSS, TICK, MESSAGE, ZWARNING
-
 
 COLOR_DEFAULT = 0xFF0000
 
@@ -132,7 +130,7 @@ class FieldModal(_BaseEmbedModal):
 
 
 class EmbedBuilder(discord.ui.View):
-    """Mimu-style interactive embed builder using buttons and modals."""
+    """Interactive Mimu-style embed builder using Discord buttons and modals."""
 
     def __init__(self, ctx: commands.Context):
         super().__init__(timeout=600)
@@ -226,8 +224,8 @@ class EmbedBuilder(discord.ui.View):
 
     async def _edit_select(self, interaction: discord.Interaction):
         selected = interaction.data.get("values", ["basic"])[0]
-        modal = {"basic": BasicModal, "style": StyleModal, "author": AuthorModal, "footer": FooterModal, "images": ImagesModal}[selected](self)
-        await interaction.response.send_modal(modal)
+        modal_class = {"basic": BasicModal, "style": StyleModal, "author": AuthorModal, "footer": FooterModal, "images": ImagesModal}[selected]
+        await interaction.response.send_modal(modal_class(self))
 
     async def _basic(self, interaction): await interaction.response.send_modal(BasicModal(self))
     async def _style(self, interaction): await interaction.response.send_modal(StyleModal(self))
@@ -293,11 +291,14 @@ class Embed(commands.Cog):
         self.bot = bot
 
     def help_custom(self):
-        return f"{MESSAGE} ", "Embed Commands", "Interactive Mimu-style embed builder"
+        return MESSAGE, "Embed Commands", "Interactive embed builder"
 
-    @commands.hybrid_command(name="embed", aliases=["embeds", "embedbuilder"], help="Open the interactive embed builder.", usage="embed")
-    @blacklist_check()
-    @ignore_check()
+    @commands.hybrid_command(
+        name="embed",
+        aliases=["embeds", "embedbuilder"],
+        help="Open the interactive embed builder.",
+        usage="embed",
+    )
     @commands.cooldown(1, 7, commands.BucketType.user)
     @commands.has_permissions(manage_messages=True)
     @commands.guild_only()
