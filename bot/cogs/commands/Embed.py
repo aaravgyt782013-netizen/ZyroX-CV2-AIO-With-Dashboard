@@ -21,25 +21,9 @@ class _BaseEmbedModal(discord.ui.Modal):
 
 
 class BasicModal(_BaseEmbedModal):
-    title_input = discord.ui.TextInput(
-        label="Title",
-        placeholder="Your embed title",
-        max_length=256,
-        required=False,
-    )
-    description_input = discord.ui.TextInput(
-        label="Description",
-        placeholder="Your embed description...",
-        style=discord.TextStyle.paragraph,
-        max_length=4096,
-        required=False,
-    )
-    url_input = discord.ui.TextInput(
-        label="Title URL",
-        placeholder="https://example.com",
-        max_length=2048,
-        required=False,
-    )
+    title_input = discord.ui.TextInput(label="Title", placeholder="Your embed title", max_length=256, required=False)
+    description_input = discord.ui.TextInput(label="Description", placeholder="Your embed description...", style=discord.TextStyle.paragraph, max_length=4096, required=False)
+    url_input = discord.ui.TextInput(label="Title URL", placeholder="https://example.com", max_length=2048, required=False)
 
     def __init__(self, builder):
         super().__init__(builder, title="Edit Embed • Basic")
@@ -55,18 +39,8 @@ class BasicModal(_BaseEmbedModal):
 
 
 class StyleModal(_BaseEmbedModal):
-    color_input = discord.ui.TextInput(
-        label="Color (HEX)",
-        placeholder="#FF0000",
-        max_length=7,
-        required=False,
-    )
-    timestamp_input = discord.ui.TextInput(
-        label="Timestamp",
-        placeholder="yes / no",
-        max_length=3,
-        required=False,
-    )
+    color_input = discord.ui.TextInput(label="Color (HEX)", placeholder="#FF0000", max_length=7, required=False)
+    timestamp_input = discord.ui.TextInput(label="Timestamp", placeholder="yes / no", max_length=3, required=False)
 
     def __init__(self, builder):
         super().__init__(builder, title="Edit Embed • Style")
@@ -77,9 +51,7 @@ class StyleModal(_BaseEmbedModal):
         raw = str(self.color_input.value).strip().lstrip("#")
         if raw:
             if not re.fullmatch(r"[0-9a-fA-F]{6}", raw):
-                return await interaction.response.send_message(
-                    f"{CROSS} Invalid HEX color. Example: `#5865F2`", ephemeral=True
-                )
+                return await interaction.response.send_message(f"{CROSS} Invalid HEX color. Example: `#5865F2`", ephemeral=True)
             self.builder.data["color"] = int(raw, 16)
         ts = str(self.timestamp_input.value).strip().lower()
         if ts:
@@ -88,9 +60,7 @@ class StyleModal(_BaseEmbedModal):
             elif ts in {"no", "n", "false", "off", "0"}:
                 self.builder.data["timestamp"] = False
             else:
-                return await interaction.response.send_message(
-                    f"{CROSS} Timestamp must be `yes` or `no`.", ephemeral=True
-                )
+                return await interaction.response.send_message(f"{CROSS} Timestamp must be `yes` or `no`.", ephemeral=True)
         await self._finish(interaction)
 
 
@@ -140,9 +110,7 @@ class ImagesModal(_BaseEmbedModal):
         for field_name, value in (("thumbnail", self.thumbnail_input.value), ("image", self.image_input.value)):
             value = str(value).strip()
             if value and not value.startswith(("http://", "https://")):
-                return await interaction.response.send_message(
-                    f"{CROSS} Image URLs must start with `http://` or `https://`.", ephemeral=True
-                )
+                return await interaction.response.send_message(f"{CROSS} Image URLs must start with `http://` or `https://`.", ephemeral=True)
             self.builder.data[field_name] = value
         await self._finish(interaction)
 
@@ -159,11 +127,7 @@ class FieldModal(_BaseEmbedModal):
         if len(self.builder.data["fields"]) >= 25:
             return await interaction.response.send_message(f"{ZWARNING} Discord allows up to 25 fields.", ephemeral=True)
         inline = str(self.inline_input.value).strip().lower() in {"yes", "y", "true", "1", "on"}
-        self.builder.data["fields"].append({
-            "name": str(self.name_input.value),
-            "value": str(self.value_input.value),
-            "inline": inline,
-        })
+        self.builder.data["fields"].append({"name": str(self.name_input.value), "value": str(self.value_input.value), "inline": inline})
         await self._finish(interaction)
 
 
@@ -176,30 +140,15 @@ class EmbedBuilder(discord.ui.View):
         self.message: Optional[discord.Message] = None
         self.destination: discord.TextChannel = ctx.channel
         self.data = {
-            "title": "",
-            "description": "",
-            "url": "",
-            "color": COLOR_DEFAULT,
-            "timestamp": False,
-            "author_name": "",
-            "author_icon": "",
-            "author_url": "",
-            "footer_text": "",
-            "footer_icon": "",
-            "thumbnail": "",
-            "image": "",
-            "fields": [],
+            "title": "", "description": "", "url": "", "color": COLOR_DEFAULT,
+            "timestamp": False, "author_name": "", "author_icon": "", "author_url": "",
+            "footer_text": "", "footer_icon": "", "thumbnail": "", "image": "", "fields": [],
         }
         self._build_components()
 
     def _build_embed(self) -> discord.Embed:
         d = self.data
-        embed = discord.Embed(
-            title=d["title"] or None,
-            description=d["description"] or None,
-            url=d["url"] or None,
-            color=d["color"],
-        )
+        embed = discord.Embed(title=d["title"] or None, description=d["description"] or None, url=d["url"] or None, color=d["color"])
         if d["timestamp"]:
             embed.timestamp = discord.utils.utcnow()
         if d["author_name"]:
@@ -224,11 +173,8 @@ class EmbedBuilder(discord.ui.View):
 
     def _build_components(self):
         self.clear_items()
-
         edit_select = discord.ui.Select(
-            placeholder="Choose what you want to edit",
-            min_values=1,
-            max_values=1,
+            placeholder="Choose what you want to edit", min_values=1, max_values=1, row=0,
             options=[
                 discord.SelectOption(label="Basic", value="basic", emoji="📝", description="Title, description and title URL"),
                 discord.SelectOption(label="Style", value="style", emoji="🎨", description="Color and timestamp"),
@@ -236,19 +182,15 @@ class EmbedBuilder(discord.ui.View):
                 discord.SelectOption(label="Footer", value="footer", emoji="📌", description="Footer text and icon"),
                 discord.SelectOption(label="Images", value="images", emoji="🖼️", description="Thumbnail and main image"),
             ],
-            row=0,
         )
         edit_select.callback = self._edit_select
         self.add_item(edit_select)
 
-        for label, emoji, callback, row in [
-            ("Basic", "📝", self._basic, 1),
-            ("Style", "🎨", self._style, 1),
-            ("Author", "👤", self._author, 1),
-            ("Footer", "📌", self._footer, 1),
-            ("Images", "🖼️", self._images, 1),
+        for label, emoji, callback in [
+            ("Basic", "📝", self._basic), ("Style", "🎨", self._style), ("Author", "👤", self._author),
+            ("Footer", "📌", self._footer), ("Images", "🖼️", self._images),
         ]:
-            button = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.secondary, row=row)
+            button = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.secondary, row=1)
             button.callback = callback
             self.add_item(button)
 
@@ -264,10 +206,7 @@ class EmbedBuilder(discord.ui.View):
 
         channel_select = discord.ui.ChannelSelect(
             placeholder="Choose destination channel (default: current channel)",
-            channel_types=[discord.ChannelType.text, discord.ChannelType.news],
-            min_values=1,
-            max_values=1,
-            row=3,
+            channel_types=[discord.ChannelType.text, discord.ChannelType.news], min_values=1, max_values=1, row=3,
         )
         channel_select.callback = self._channel_select
         self.add_item(channel_select)
@@ -287,22 +226,15 @@ class EmbedBuilder(discord.ui.View):
 
     async def _edit_select(self, interaction: discord.Interaction):
         selected = interaction.data.get("values", ["basic"])[0]
-        await interaction.response.send_modal({
-            "basic": BasicModal,
-            "style": StyleModal,
-            "author": AuthorModal,
-            "footer": FooterModal,
-            "images": ImagesModal,
-        }[selected](self))
+        modal = {"basic": BasicModal, "style": StyleModal, "author": AuthorModal, "footer": FooterModal, "images": ImagesModal}[selected](self)
+        await interaction.response.send_modal(modal)
 
     async def _basic(self, interaction): await interaction.response.send_modal(BasicModal(self))
     async def _style(self, interaction): await interaction.response.send_modal(StyleModal(self))
     async def _author(self, interaction): await interaction.response.send_modal(AuthorModal(self))
     async def _footer(self, interaction): await interaction.response.send_modal(FooterModal(self))
     async def _images(self, interaction): await interaction.response.send_modal(ImagesModal(self))
-
-    async def _add_field(self, interaction):
-        await interaction.response.send_modal(FieldModal(self))
+    async def _add_field(self, interaction): await interaction.response.send_modal(FieldModal(self))
 
     async def _remove_field(self, interaction):
         if self.data["fields"]:
@@ -313,9 +245,9 @@ class EmbedBuilder(discord.ui.View):
 
     async def _reset(self, interaction):
         self.data.update({
-            "title": "", "description": "", "url": "", "color": COLOR_DEFAULT,
-            "timestamp": False, "author_name": "", "author_icon": "", "author_url": "",
-            "footer_text": "", "footer_icon": "", "thumbnail": "", "image": "", "fields": [],
+            "title": "", "description": "", "url": "", "color": COLOR_DEFAULT, "timestamp": False,
+            "author_name": "", "author_icon": "", "author_url": "", "footer_text": "", "footer_icon": "",
+            "thumbnail": "", "image": "", "fields": [],
         })
         await self.refresh(interaction)
 
@@ -332,9 +264,7 @@ class EmbedBuilder(discord.ui.View):
         try:
             await self.destination.send(embed=self._build_embed())
         except discord.Forbidden:
-            return await interaction.response.send_message(
-                f"{ZWARNING} I cannot send embeds in {self.destination.mention}.", ephemeral=True
-            )
+            return await interaction.response.send_message(f"{ZWARNING} I cannot send embeds in {self.destination.mention}.", ephemeral=True)
         except discord.HTTPException as exc:
             return await interaction.response.send_message(f"{CROSS} Discord rejected the embed: `{exc}`", ephemeral=True)
         await interaction.response.send_message(f"{TICK} Embed sent to {self.destination.mention}.", ephemeral=True)
@@ -346,7 +276,9 @@ class EmbedBuilder(discord.ui.View):
 
     async def refresh(self, interaction: discord.Interaction):
         self._build_components()
-        await interaction.response.edit_message(embed=self._build_embed(), view=self)
+        await interaction.response.defer()
+        if self.message:
+            await self.message.edit(embed=self._build_embed(), view=self)
 
     async def on_timeout(self):
         if self.message:
@@ -363,12 +295,7 @@ class Embed(commands.Cog):
     def help_custom(self):
         return f"{MESSAGE} ", "Embed Commands", "Interactive Mimu-style embed builder"
 
-    @commands.hybrid_command(
-        name="embed",
-        aliases=["embeds", "embedbuilder"],
-        help="Open the interactive embed builder.",
-        usage="embed",
-    )
+    @commands.hybrid_command(name="embed", aliases=["embeds", "embedbuilder"], help="Open the interactive embed builder.", usage="embed")
     @blacklist_check()
     @ignore_check()
     @commands.cooldown(1, 7, commands.BucketType.user)
