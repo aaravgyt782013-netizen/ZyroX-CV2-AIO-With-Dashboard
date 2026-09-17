@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.Tools import getConfig, updateConfig
+from .purge import Purge
 
 
 class Prefix(commands.Cog):
@@ -26,25 +27,16 @@ class Prefix(commands.Cog):
         new_prefix = new_prefix.strip()
 
         if not new_prefix:
-            await interaction.response.send_message(
-                "❌ The prefix cannot be empty.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ The prefix cannot be empty.", ephemeral=True)
             return
-
         if len(new_prefix) > 5:
-            await interaction.response.send_message(
-                "❌ The prefix must be between **1 and 5 characters**.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ The prefix must be between **1 and 5 characters**.", ephemeral=True)
             return
-
         if new_prefix.isspace():
-            await interaction.response.send_message(
-                "❌ The prefix cannot contain only spaces.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ The prefix cannot contain only spaces.", ephemeral=True)
             return
 
         await updateConfig(interaction.guild.id, {"prefix": new_prefix})
-
         await interaction.response.send_message(
             f"✅ Prefix updated successfully.\n\n"
             f"This server's prefix is now: **`{new_prefix}`**\n"
@@ -57,7 +49,6 @@ class Prefix(commands.Cog):
             message = "❌ You need the **Administrator** permission to change the server prefix."
         else:
             message = "❌ I couldn't change the server prefix. Please try again."
-
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:
@@ -66,3 +57,4 @@ class Prefix(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Prefix(bot))
+    await bot.add_cog(Purge(bot))
