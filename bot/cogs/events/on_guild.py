@@ -2,13 +2,9 @@
 # ║                                                                  ║
 # ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
 # ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
+# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀░░░▀▀▀░░▀░░▀▀▀                     ║
 # ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
+# ║            © 2026 LightCore — All Rights Reserved               ║
 # ║                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
@@ -19,6 +15,7 @@ from utils.emoji import ARROWRED, KING, ZBOT, ZHUMAN, ZROCKET
 import logging
 from discord.ui import View, Button, Select
 from utils.config import *
+from utils import getConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -99,8 +96,19 @@ Threads : {len(guild.threads)}
             if not guild.chunked:
                 await guild.chunk()
 
+            # The welcome message must use this guild's configured prefix.
+            try:
+                guild_config = await getConfig(guild.id)
+                prefix = guild_config.get("prefix", ".")
+            except Exception:
+                prefix = "."
+
             embed = discord.Embed(
-                description=f"{ARROWRED} Prefix For This Server is `>`\n{ARROWRED} Get Started with `>help`\n{ARROWRED} For detailed guides, FAQ & information, visit our **[Support Server](https://discord.gg/codexdev)**",
+                description=(
+                    f"{ARROWRED} My default prefix is `{prefix}`\n"
+                    f"{ARROWRED} Use the `{prefix}help` command to see a list of commands\n"
+                    f"{ARROWRED} For detailed guides, FAQ & information, visit our **[Support Server]({serverLink})**"
+                ),
                 color=0xFF0000,
             )
             embed.set_author(
@@ -115,7 +123,7 @@ Threads : {len(guild.threads)}
             support = Button(
                 label="Support",
                 style=discord.ButtonStyle.link,
-                url=f"https://discord.gg/codexdev",
+                url=serverLink,
             )
 
             view = View()
