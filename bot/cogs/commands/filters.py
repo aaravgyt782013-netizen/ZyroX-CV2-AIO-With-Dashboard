@@ -27,10 +27,32 @@ class FilterCog(commands.Cog):
         self._stalled = {}
         self._retrying = set()
         self._audio_monitor = bot.loop.create_task(self._monitor_audio())
+        self._prefix_migration = bot.loop.create_task(self._migrate_prefixes())
 
     def cog_unload(self):
-        if not self._audio_monitor.done():
-            self._audio_monitor.cancel()
+        for task in (self._audio_monitor, self._prefix_migration):
+            if not task.done():
+                task.cancel()
+
+    async def _migrate_prefixes(self):
+        """Migrate the old default prefix to the new dot prefix."""
+        await self.bot.wait_until_ready()
+        for guild in list(self.bot.guilds):
+            try:
+                config = await getConfig(guild.id)
+                if config.get("prefix") == ">":
+                    await updateConfig(guild.id, {"prefix": "."})
+            except Exception:
+                continue
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild: discord.Guild):
+        try:
+            config = await getConfig(guild.id)
+            if config.get("prefix") == ">":
+                await updateConfig(guild.id, {"prefix": "."})
+        except Exception:
+            pass
 
     async def _monitor_audio(self):
         """Keep the Lavalink player gain stable and recover from a stalled stream."""
@@ -48,8 +70,6 @@ class FilterCog(commands.Cog):
                         self._stalled.pop(player.guild.id, None)
                         continue
 
-                    # Keep the player's gain fixed. Track-to-track loudness can still
-                    # differ because the original recordings have different mastering.
                     if getattr(player, "volume", 100) != 100:
                         await player.set_volume(100)
 
@@ -65,9 +85,6 @@ class FilterCog(commands.Cog):
 
                     self._stalled[guild_id] = (track_id, position, stalled_for)
 
-                    # About 20 seconds without progress while unpaused usually means
-                    # Lavalink/source playback has stalled. Re-seek from the current
-                    # position once instead of leaving the bot silently connected.
                     if stalled_for >= 2 and guild_id not in self._retrying:
                         self._retrying.add(guild_id)
                         try:
@@ -78,7 +95,6 @@ class FilterCog(commands.Cog):
                         finally:
                             self._retrying.discard(guild_id)
                 except Exception:
-                    # Never let the stability monitor interfere with normal playback.
                     continue
 
     async def apply_filter(self, ctx: commands.Context, filter_name: str):
