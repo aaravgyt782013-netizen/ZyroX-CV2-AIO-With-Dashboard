@@ -1,7 +1,7 @@
 """LightCore music reliability layer.
 
 Adds resilient Lavalink handling, direct YouTube/YouTube Music URL support,
-and a fresh control panel whenever a new track starts.
+and a fresh beta-labelled control panel whenever a new track starts.
 """
 
 import asyncio
@@ -38,12 +38,9 @@ def _patch_music_class():
 
         if not configs:
             configs = [
-                {"host": "lavalinkv4.serenetia.com", "port": 443,
-                 "password": "https://seretia.link/discord", "secure": True},
-                {"host": "lava-v4.millohost.my.id", "port": 443,
-                 "password": "https://discord.gg/mjS5J2K3ep", "secure": True},
-                {"host": "lava-v4.ajieblogs.eu.org", "port": 80,
-                 "password": "https://dsc.gg/ajidevserver", "secure": False},
+                {"host": "lavalinkv4.serenetia.com", "port": 443, "password": "https://seretia.link/discord", "secure": True},
+                {"host": "lava-v4.millohost.my.id", "port": 443, "password": "https://discord.gg/mjS5J2K3ep", "secure": True},
+                {"host": "lava-v4.ajieblogs.eu.org", "port": 80, "password": "https://dsc.gg/ajidevserver", "secure": False},
             ]
 
         nodes = []
@@ -54,14 +51,7 @@ def _patch_music_class():
                 password = str(item["password"])
                 secure = bool(item.get("secure", port == 443))
                 uri = f"https://{host}:{port}" if secure else f"http://{host}:{port}"
-                nodes.append(wavelink.Node(
-                    identifier=f"lightcore-{index + 1}",
-                    uri=uri,
-                    password=password,
-                    retries=None,
-                    resume_timeout=180,
-                    inactive_player_timeout=None,
-                ))
+                nodes.append(wavelink.Node(identifier=f"lightcore-{index + 1}", uri=uri, password=password, retries=None, resume_timeout=180, inactive_player_timeout=None))
             except Exception as exc:
                 print(f"[LightCore Music] Invalid Lavalink node config: {exc}")
 
@@ -136,12 +126,6 @@ class Music247(commands.Cog):
         self.bot = bot
         self.retry_tasks = {}
 
-    @staticmethod
-    def _beta_panel(view):
-        # The actual panel is built by MusicControlView; this helper is kept
-        # intentionally small so the existing controls remain unchanged.
-        return view
-
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, payload):
         player = payload.player
@@ -151,14 +135,12 @@ class Music247(commands.Cog):
             return
         try:
             from .music import MusicControlView
-            await ctx.send(view=MusicControlView(player, ctx, track, False, beta_testing=True))
-        except TypeError:
-            # Backward-compatible fallback if the base view has not yet been
-            # updated with the beta_testing parameter.
-            try:
-                await ctx.send(view=MusicControlView(player, ctx, track, False))
-            except Exception as exc:
-                print(f"[LightCore Music] Could not send track control panel: {exc}")
+            from discord.ui import TextDisplay
+            view = MusicControlView(player, ctx, track, False)
+            # Keep the existing working control panel intact and add a clear
+            # beta-testing label to every newly posted Now Playing panel.
+            view.add_item(TextDisplay("🧪 **BETA TESTING** • LightCore Music"))
+            await ctx.send(view=view)
         except Exception as exc:
             print(f"[LightCore Music] Could not send track control panel: {exc}")
 
