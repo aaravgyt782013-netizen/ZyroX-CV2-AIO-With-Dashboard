@@ -1,18 +1,4 @@
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║                                                                  ║
-# ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
-# ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
-# ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
-# ║                                                                  ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
-from __future__ import annotations
+from __future__
 from discord.ext import commands, tasks
 import discord
 import aiohttp
@@ -31,7 +17,6 @@ import inspect
 
 init(autoreset=True)
 
-# Corrected the extensions list
 extensions: List[str] = [
     "cogs"
 ]
@@ -44,7 +29,6 @@ class zyrox(commands.AutoShardedBot):
         super().__init__(command_prefix=self.get_prefix,
                          case_insensitive=True,
                          intents=intents,
-                         # The status is already set to Do Not Disturb here
                          status=discord.Status.do_not_disturb,
                          strip_after_prefix=True,
                          owner_ids=OWNER_IDS,
@@ -74,17 +58,14 @@ class zyrox(commands.AutoShardedBot):
         await self.wait_until_ready()
         if not self.guilds:
             return
-
-        guild = self.guilds[0]  # Use first available guild for prefix
+        guild = self.guilds[0]
         try:
             config = await getConfig(guild.id)
-            prefix = config.get("prefix", ">")
-        except:
-            prefix = ">"
-
+            prefix = config.get("prefix", ".")
+        except Exception:
+            prefix = "."
         user_count = sum(g.member_count or 0 for g in self.guilds)
         guild_count = len(self.guilds)
-
         self.status_list = [
             (discord.ActivityType.playing, f"{prefix}help | Security in your Server"),
             (discord.ActivityType.watching, f"{user_count} users"),
@@ -92,9 +73,7 @@ class zyrox(commands.AutoShardedBot):
             (discord.ActivityType.listening, "Killing Nukers"),
             (discord.ActivityType.playing, f"Protector {BotName}"),
         ]
-
         current = self.status_list[self.status_index % len(self.status_list)]
-        # This task only changes the activity, not the online status (dnd, idle, etc.)
         await self.change_presence(activity=discord.Activity(type=current[0], name=current[1]))
         self.status_index += 1
 
@@ -118,16 +97,13 @@ class zyrox(commands.AutoShardedBot):
             prefix = data["prefix"]
             if row:
                 return commands.when_mentioned_or(prefix, '')(self, message)
-            else:
-                return commands.when_mentioned_or(prefix)(self, message)
-        else:
-            async with aiosqlite.connect('db/np.db') as db:
-                async with db.execute("SELECT id FROM np WHERE id = ?", (message.author.id,)) as cursor:
-                    row = await cursor.fetchone()
-            if row:
-                return commands.when_mentioned_or('?', '')(self, message)
-            else:
-                return commands.when_mentioned_or('')(self, message)
+            return commands.when_mentioned_or(prefix)(self, message)
+        async with aiosqlite.connect('db/np.db') as db:
+            async with db.execute("SELECT id FROM np WHERE id = ?", (message.author.id,)) as cursor:
+                row = await cursor.fetchone()
+        if row:
+            return commands.when_mentioned_or('.', '')(self, message)
+        return commands.when_mentioned_or('.')(self, message)
 
     async def on_message_edit(self, before, after):
         ctx: Context = await self.get_context(after, cls=Context)
