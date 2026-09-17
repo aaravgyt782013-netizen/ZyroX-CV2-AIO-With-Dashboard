@@ -55,13 +55,23 @@ class Prefix(commands.Cog):
         else:
             await interaction.response.send_message(message, ephemeral=True)
 
+    async def _purge_access(self, ctx: commands.Context):
+        """Allow the bot owner to purge in any server, or staff with Manage Messages."""
+        if await self.bot.is_owner(ctx.author):
+            return True
+        return ctx.author.guild_permissions.manage_messages
+
     @commands.command(name="purge", aliases=["clear"])
     @commands.guild_only()
-    @commands.has_permissions(manage_messages=True)
+    @commands.check(_purge_access)
     @commands.bot_has_permissions(manage_messages=True)
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def purge(self, ctx: commands.Context, amount: int):
-        """Delete recent messages using the server's configured prefix."""
+        """Delete recent messages using the server's configured prefix.
+
+        The bot owner can use this command in any server. Other users need
+        the Manage Messages permission.
+        """
         if amount < 1:
             await ctx.send("❌ Amount must be at least **1**.", delete_after=5)
             return
@@ -88,8 +98,11 @@ class Prefix(commands.Cog):
 
     @purge.error
     async def purge_error(self, ctx: commands.Context, error: commands.CommandError):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ You need the **Manage Messages** permission to use purge.", delete_after=5)
+        if isinstance(error, commands.CheckFailure):
+            await ctx.send(
+                "❌ You need the **Manage Messages** permission to use purge.",
+                delete_after=5,
+            )
         elif isinstance(error, commands.BotMissingPermissions):
             await ctx.send("❌ I need the **Manage Messages** permission to use purge.", delete_after=5)
         elif isinstance(error, commands.MissingRequiredArgument):
