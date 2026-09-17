@@ -4,11 +4,9 @@
 # ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
 # ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
 # ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
+# ║            © 2026 LightCore — All Rights Reserved               ║
 # ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
+# ║   discord  ──  https://discord.gg/Ehmqr5drSz                   ║
 # ║                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
@@ -18,19 +16,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TOKEN      = os.environ.get("TOKEN")
-BRAND_NAME = os.environ.get("brand_name", "Zyrox X")
+BRAND_NAME = os.environ.get("brand_name", "LightCore")
 NAME       = BRAND_NAME
 BotName    = BRAND_NAME
 
-server     = "https://discord.gg/codexdev"
-serverLink = "https://discord.gg/codexdev"
-ch         = "https://discord.com/channels/699587669059174461/1271825678710476911"
+# LightCore support/community links
+server     = "https://discord.gg/Ehmqr5drSz"
+serverLink = "https://discord.gg/Ehmqr5drSz"
+ch         = serverLink
 
 CMD_WEBHOOK_URL = os.getenv("CMD_WEBHOOK_URL")
 
 # ── Owner / Staff IDs ─────────────────────────────────────────────────────────
 # Edit OWNER_IDS in .env — comma-separated, no spaces needed.
-# Example:  OWNER_IDS = 870179991462236170,767979794411028491,1432771000629596225
+# Example:  OWNER_IDS = 870179991462236170,767979991411028491,1432771000629596225
 
 def _parse_ids(env_key: str, defaults: list[int]) -> list[int]:
     raw = os.getenv(env_key, "").strip()
