@@ -4,11 +4,7 @@
 # ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
 # ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
 # ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
+# ║            © 2026 LightCore — All Rights Reserved               ║
 # ║                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
@@ -23,6 +19,27 @@ from utils.Tools import *
 class Status(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.command(name="servers", aliases=["serverlist", "guilds"], help="Shows all servers the bot is in (owner only).")
+    @commands.is_owner()
+    async def servers(self, ctx):
+        servers = sorted(self.bot.guilds, key=lambda g: (g.member_count or 0), reverse=True)
+        if not servers:
+            return await ctx.send("The bot is not currently in any servers.")
+
+        lines = [
+            f"`{i}.` **{discord.utils.escape_markdown(guild.name)}** — `{guild.id}` — `{guild.member_count or 0}` members"
+            for i, guild in enumerate(servers, 1)
+        ]
+        chunks = [lines[i:i + 20] for i in range(0, len(lines), 20)]
+        for page, chunk in enumerate(chunks, 1):
+            embed = discord.Embed(
+                title=f"{self.bot.user.name} Servers",
+                description="\n".join(chunk),
+                color=0xFF0000,
+            )
+            embed.set_footer(text=f"Page {page}/{len(chunks)} • Total: {len(servers)} servers")
+            await ctx.send(embed=embed)
 
     @commands.command(name="status", help="Shows the status of the user in detail.")
     @blacklist_check()
@@ -115,13 +132,13 @@ class Status(commands.Cog):
         draw_mask = ImageDraw.Draw(mask)
         draw_mask.ellipse((0, 0, 160, 160), fill=255)
 
-        base_img.paste(album_img, (30, 30), mask) 
+        base_img.paste(album_img, (30, 30), mask)
 
         font_path = 'utils/arial.ttf'
         font = ImageFont.truetype(font_path, 40)
 
         truncated_song_name = song_name if len(song_name) <= 60 else song_name[:57] + "..."
-        song_name_position = (220, 70) 
+        song_name_position = (220, 70)
         draw.text(song_name_position, truncated_song_name, font=font, fill="white")
 
         base_img.save(output_path)
@@ -164,4 +181,3 @@ class Status(commands.Cog):
             elif isinstance(activity, discord.Activity):
                 activity_list.append(f"{activity.type.name.capitalize()} {activity.name}")
         return "\n".join(activity_list) if activity_list else None
-
