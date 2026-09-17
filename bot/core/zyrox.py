@@ -66,8 +66,10 @@ class zyrox(commands.AutoShardedBot):
             prefix = "."
         user_count = sum(g.member_count or 0 for g in self.guilds)
         guild_count = len(self.guilds)
+        # The bot bio/playing text always advertises the global default prefix.
+        # Per-server custom prefixes still work through get_prefix().
         self.status_list = [
-            (discord.ActivityType.playing, f"{prefix}help | Security in your Server"),
+            (discord.ActivityType.playing, ".help | Security in your Server"),
             (discord.ActivityType.watching, f"{user_count} users"),
             (discord.ActivityType.watching, f"{guild_count} servers"),
             (discord.ActivityType.listening, "Killing Nukers"),
