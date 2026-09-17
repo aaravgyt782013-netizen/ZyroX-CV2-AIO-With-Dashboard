@@ -1,13 +1,3 @@
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║                                                                  ║
-# ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
-# ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀░░░▀▀▀░░▀░░▀▀▀                     ║
-# ║                                                                  ║
-# ║            © 2026 LightCore — All Rights Reserved               ║
-# ║                                                                  ║
-# ╚══════════════════════════════════════════════════════════════════╝
-
 import discord
 from utils.emoji import ARROWRED, BOOST, CAST, GAMES, LEVEL_UP, LOADINGRED, LOCK, MESSAGE, MINECRAFT, MUSIC, NEW, PIN, SEED, STAR, SWORD, SYSTEM, THUNDER, TICKET, WIFI, ZAI, ZARROW, ZBAN, ZBOT, ZCIRCLE, ZCIRCLE_ALT1, ZCLOUD, ZCOUNTING, ZMODULE, ZPEOPLE, ZROCKET, ZSAFE, ZTADA, ZUNMUTE, ZWRENCH
 from discord.ext import commands
@@ -44,13 +34,9 @@ class HelpCommand(commands.HelpCommand):
       await ctx.reply(f"You are ignored.", mention_author=False)
 
   async def on_help_command_error(self, ctx, error):
-    errors = [
-      commands.CommandOnCooldown, commands.CommandNotFound,
-      discord.HTTPException, commands.CommandInvokeError
-    ]
+    errors = [commands.CommandOnCooldown, commands.CommandNotFound, discord.HTTPException, commands.CommandInvokeError]
     if not type(error) in errors:
-      await self.context.reply(f"Unknown Error Occurred\n{error.original}",
-                               mention_author=False)
+      await self.context.reply(f"Unknown Error Occurred\n{error.original}", mention_author=False)
     else:
       if type(error) == commands.CommandOnCooldown:
         return
@@ -60,48 +46,42 @@ class HelpCommand(commands.HelpCommand):
     ctx = self.context
     check_ignore = await ignore_check().predicate(ctx)
     check_blacklist = await blacklist_check().predicate(ctx)
-
     if not check_blacklist:
-        return
-
+      return
     if not check_ignore:
-        await self.send_ignore_message(ctx, "command")
-        return
-
+      await self.send_ignore_message(ctx, "command")
+      return
     cmds = (str(cmd) for cmd in self.context.bot.walk_commands())
     matches = get_close_matches(string, cmds)
-
-    embed = CV2Embed(
-        title=f"{BotName} Helper",
-        description=f">>> **Ops! Command not found with the name** `{string}`.",
-        color=0xFF0000
-    )
-
+    embed = CV2Embed(title=f"{BotName} Helper", description=f">>> **Ops! Command not found with the name** `{string}`.", color=0xFF0000)
     await ctx.reply(view=embed, mention_author=True)
 
   async def send_bot_help(self, mapping):
     ctx = self.context
     check_ignore = await ignore_check().predicate(ctx)
     check_blacklist = await blacklist_check().predicate(ctx)
-
     if not check_blacklist:
       return
-
     if not check_ignore:
       await self.send_ignore_message(ctx, "command")
       return
 
     loading_embed = CV2(f"{LOADINGRED} Loading help Menu...")
     loading_msg = await ctx.reply(view=loading_embed)
-
     await asyncio.sleep(2)
-
     with suppress(discord.NotFound):
       await loading_msg.delete()
 
     data = await getConfig(self.context.guild.id)
     prefix = data["prefix"]
     filtered = await self.filter_commands(self.context.bot.walk_commands(), sort=True)
+
+    # Force the Embed cog into the mapping so its category is always available
+    # in the main help category dropdown.
+    mapping = dict(mapping)
+    embed_cog = self.context.bot.get_cog("Embed")
+    if embed_cog is not None and embed_cog not in mapping:
+      mapping[embed_cog] = list(embed_cog.get_commands())
 
     embed = CV2Embed(
         description=(
@@ -129,6 +109,7 @@ class HelpCommand(commands.HelpCommand):
               f" {ZTADA} `»` Giveaway\n"
               f" {TICKET} `»` Ticket {NEW}\n"
               f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
+              f" {MESSAGE} `»` Embed Commands {NEW}\n"
     )
 
     embed.add_field(
@@ -149,10 +130,7 @@ class HelpCommand(commands.HelpCommand):
               f" {ZCIRCLE_ALT1} `»` Customrole\n"
     )
 
-    embed.set_footer(
-      text=f"Requested By {self.context.author} | [Support]({serverLink})",
-    )
-
+    embed.set_footer(text=f"Requested By {self.context.author} | [Support]({serverLink})")
     view = vhelp.View(mapping=mapping, ctx=self.context, homeembed=embed, ui=2)
     await ctx.reply(view=view)
 
@@ -160,25 +138,17 @@ class HelpCommand(commands.HelpCommand):
     ctx = self.context
     check_ignore = await ignore_check().predicate(ctx)
     check_blacklist = await blacklist_check().predicate(ctx)
-
     if not check_blacklist:
       return
-
     if not check_ignore:
       await self.send_ignore_message(ctx, "command")
       return
 
     zyrox = f">>> {command.help}" if command.help else '>>> No Help Provided...'
-    embed = CV2Embed(
-        description=f"""{zyrox}""",
-        color=color)
+    embed = CV2Embed(description=f"""{zyrox}""", color=color)
     alias = ' & '.join(command.aliases)
-
-    embed.add_field(name="**Alt cmd**",
-                      value=f"```{alias}```" if command.aliases else "No Alt cmd",
-                      inline=False)
-    embed.add_field(name="**Usage**",
-                      value=f"```{self.context.prefix}{command.signature}```\n")
+    embed.add_field(name="**Alt cmd**", value=f"```{alias}```" if command.aliases else "No Alt cmd", inline=False)
+    embed.add_field(name="**Usage**", value=f"```{self.context.prefix}{command.signature}```\n")
     embed.set_author(name=f"{command.qualified_name.title()} Command")
     embed.set_footer(text="<[] = optional | < > = required • Use Prefix Before Commands.")
     await self.context.reply(view=embed, mention_author=False)
@@ -206,31 +176,17 @@ class HelpCommand(commands.HelpCommand):
     ctx = self.context
     check_ignore = await ignore_check().predicate(ctx)
     check_blacklist = await blacklist_check().predicate(ctx)
-
     if not check_blacklist:
       return
-
     if not check_ignore:
       await self.send_ignore_message(ctx, "command")
       return
-
     entries = [
-        (
-            f"`{self.context.prefix}{cmd.qualified_name}`\n",
-            f"{cmd.short_doc if cmd.short_doc else ''}\n\u200b"
-        )
+        (f"`{self.context.prefix}{cmd.qualified_name}`\n", f"{cmd.short_doc if cmd.short_doc else ''}\n\u200b")
         for cmd in group.commands
-      ]
-
+    ]
     count = len(group.commands)
-
-    embeds = FieldPagePaginator(
-      entries=entries,
-      title=f"{group.qualified_name.title()} [{count}]",
-      description="< > Duty | [ ] Optional\n",
-      per_page=4
-    ).get_pages()
-
+    embeds = FieldPagePaginator(entries=entries, title=f"{group.qualified_name.title()} [{count}]", description="< > Duty | [ ] Optional\n", per_page=4).get_pages()
     paginator = Paginator(ctx, embeds)
     await paginator.paginate()
 
@@ -238,26 +194,22 @@ class HelpCommand(commands.HelpCommand):
     ctx = self.context
     check_ignore = await ignore_check().predicate(ctx)
     check_blacklist = await blacklist_check().predicate(ctx)
-
     if not check_blacklist:
       return
-
     if not check_ignore:
       await self.send_ignore_message(ctx, "command")
       return
-
-    entries = [(
-      f"> `{self.context.prefix}{cmd.qualified_name}`",
-      f"-# Description : {cmd.short_doc if cmd.short_doc else ''}"
-      f"\n\u200b",
-    ) for cmd in cog.get_commands()]
+    entries = [
+      (f"> `{self.context.prefix}{cmd.qualified_name}`", f"-# Description : {cmd.short_doc if cmd.short_doc else ''}\n\u200b")
+      for cmd in cog.get_commands()
+    ]
     paginator = Paginator(source=FieldPagePaginator(
       entries=entries,
       title=f"{BRAND_NAME}'s {cog.qualified_name.title()} ({len(cog.get_commands())})",
       description="`<..> Required | [..] Optional`\n\n",
       color=0xFF0000,
       per_page=4),
-                          ctx=self.context)
+      ctx=self.context)
     await paginator.paginate()
 
 
