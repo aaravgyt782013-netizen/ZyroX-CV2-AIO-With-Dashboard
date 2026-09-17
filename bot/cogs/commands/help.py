@@ -1,230 +1,232 @@
 import discord
-from utils.emoji import ARROWRED, BOOST, CAST, GAMES, LEVEL_UP, LOADINGRED, LOCK, MESSAGE, MINECRAFT, MUSIC, NEW, PIN, SEED, STAR, SWORD, SYSTEM, THUNDER, TICKET, WIFI, ZAI, ZARROW, ZBAN, ZBOT, ZCIRCLE, ZCIRCLE_ALT1, ZCLOUD, ZCOUNTING, ZMODULE, ZPEOPLE, ZROCKET, ZSAFE, ZTADA, ZUNMUTE, ZWRENCH
 from discord.ext import commands
-from discord import app_commands, Interaction
+from discord import app_commands
 from difflib import get_close_matches
 from contextlib import suppress
+import asyncio
+
 from core import Context
 from core.zyrox import zyrox
 from core.Cog import Cog
-from utils.Tools import getConfig
-from itertools import chain
-import json
-from utils import help as vhelp
-from utils import Paginator, DescriptionEmbedPaginator, FieldPagePaginator, TextPaginator
-import asyncio
-from utils.config import serverLink
 from utils.Tools import *
+from utils.Tools import getConfig
 from utils.cv2 import CV2, CV2Embed
-from utils.config import *
+from utils.config import serverLink, BotName, BRAND_NAME
+from utils import help as vhelp
+from utils import Paginator, FieldPagePaginator
+from utils.emoji import *
 
 color = 0xFF0000
 client = zyrox()
 
-from utils.config import BotName
 
 class HelpCommand(commands.HelpCommand):
+    async def send_ignore_message(self, ctx, ignore_type: str):
+        if ignore_type == "channel":
+            await ctx.reply("This channel is ignored.", mention_author=False)
+        elif ignore_type == "command":
+            await ctx.reply(f"{ctx.author.mention} This Command, Channel, or You have been ignored here.", delete_after=6)
+        elif ignore_type == "user":
+            await ctx.reply("You are ignored.", mention_author=False)
 
-  async def send_ignore_message(self, ctx, ignore_type: str):
-    if ignore_type == "channel":
-      await ctx.reply(f"This channel is ignored.", mention_author=False)
-    elif ignore_type == "command":
-      await ctx.reply(f"{ctx.author.mention} This Command, Channel, or You have been ignored here.", delete_after=6)
-    elif ignore_type == "user":
-      await ctx.reply(f"You are ignored.", mention_author=False)
+    async def _allowed(self, ctx):
+        try:
+            if not await blacklist_check().predicate(ctx):
+                return False
+            if not await ignore_check().predicate(ctx):
+                await self.send_ignore_message(ctx, "command")
+                return False
+        except Exception:
+            # Help must remain available even if an optional ignore/blacklist check fails.
+            pass
+        return True
 
-  async def on_help_command_error(self, ctx, error):
-    errors = [commands.CommandOnCooldown, commands.CommandNotFound, discord.HTTPException, commands.CommandInvokeError]
-    if not type(error) in errors:
-      await self.context.reply(f"Unknown Error Occurred\n{error.original}", mention_author=False)
-    else:
-      if type(error) == commands.CommandOnCooldown:
-        return
-    return await super().on_help_command_error(ctx, error)
+    async def on_help_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            return
+        if isinstance(error, commands.CommandInvokeError):
+            error = error.original
+        with suppress(Exception):
+            await ctx.reply(f"❌ Help menu error: `{error}`", mention_author=False)
 
-  async def command_not_found(self, string: str) -> None:
-    ctx = self.context
-    check_ignore = await ignore_check().predicate(ctx)
-    check_blacklist = await blacklist_check().predicate(ctx)
-    if not check_blacklist:
-      return
-    if not check_ignore:
-      await self.send_ignore_message(ctx, "command")
-      return
-    cmds = (str(cmd) for cmd in self.context.bot.walk_commands())
-    matches = get_close_matches(string, cmds)
-    embed = CV2Embed(title=f"{BotName} Helper", description=f">>> **Ops! Command not found with the name** `{string}`.", color=0xFF0000)
-    await ctx.reply(view=embed, mention_author=True)
+    async def command_not_found(self, string: str) -> None:
+        ctx = self.context
+        if not await self._allowed(ctx):
+            return
+        cmds = [str(cmd) for cmd in self.context.bot.walk_commands()]
+        matches = get_close_matches(string, cmds)
+        suggestion = f"\nDid you mean `{ctx.prefix}{matches[0]}`?" if matches else ""
+        embed = CV2Embed(
+            title=f"{BotName} Helper",
+            description=f">>> **Command not found:** `{string}`.{suggestion}",
+            color=color,
+        )
+        await ctx.reply(view=embed, mention_author=False)
 
-  async def send_bot_help(self, mapping):
-    ctx = self.context
-    check_ignore = await ignore_check().predicate(ctx)
-    check_blacklist = await blacklist_check().predicate(ctx)
-    if not check_blacklist:
-      return
-    if not check_ignore:
-      await self.send_ignore_message(ctx, "command")
-      return
+    async def send_bot_help(self, mapping):
+        ctx = self.context
+        if not await self._allowed(ctx):
+            return
 
-    loading_embed = CV2(f"{LOADINGRED} Loading help Menu...")
-    loading_msg = await ctx.reply(view=loading_embed)
-    await asyncio.sleep(2)
-    with suppress(discord.NotFound):
-      await loading_msg.delete()
+        data = await getConfig(ctx.guild.id) if ctx.guild else {"prefix": "."}
+        prefix = data.get("prefix", ".")
 
-    data = await getConfig(self.context.guild.id)
-    prefix = data["prefix"]
-    filtered = await self.filter_commands(self.context.bot.walk_commands(), sort=True)
+        # Build a clean mapping from the commands currently registered with the bot.
+        mapping = dict(mapping)
+        for cog in list(mapping.keys()):
+            if cog is None:
+                mapping.pop(cog, None)
 
-    # Force the Embed cog into the mapping so its category is always available
-    # in the main help category dropdown.
-    mapping = dict(mapping)
-    embed_cog = self.context.bot.get_cog("Embed")
-    if embed_cog is not None and embed_cog not in mapping:
-      mapping[embed_cog] = list(embed_cog.get_commands())
+        # Explicitly include TempVoice and Embed so their categories appear even when
+        # the loader did not place them in HelpCommand's original mapping.
+        for cog_name in ("TempVoice", "Embed"):
+            cog = ctx.bot.get_cog(cog_name)
+            if cog is not None:
+                mapping[cog] = list(cog.get_commands())
 
-    embed = CV2Embed(
-        description=(
-         f"**{ARROWRED} __Start {BotName} Today__**\n"
-         f"**{ZARROW} Type {prefix}antinuke enable**\n"
-         f"**{ZARROW} Server Prefix:** `{prefix}`\n"
-         f"**{ZARROW} Total Commands:** `{len(set(self.context.bot.walk_commands()))}`\n"),
-        color=0xFF0000)
+        embed = CV2Embed(
+            title=f"{BotName} Help",
+            description=(
+                f"**{ARROWRED} __Start {BotName} Today__**\n"
+                f"**{ZARROW} Server Prefix:** `{prefix}`\n"
+                f"**{ZARROW} Total Commands:** `{len(set(ctx.bot.walk_commands()))}`\n\n"
+                f"Select a category below to view its commands."
+            ),
+            color=color,
+        )
+        embed.add_field(
+            name=f"{ZCLOUD} Main Features",
+            value=(
+                f">>> {ZSAFE} `»` Security\n"
+                f" {ZBOT} `»` Automoderation\n"
+                f" {ZWRENCH} `»` Utility\n"
+                f" {MUSIC} `»` Music\n"
+                f" {WIFI} `»` Autoreact & responder\n"
+                f" {SWORD} `»` Moderation\n"
+                f" {ZPEOPLE} `»` Autorole & Invc\n"
+                f" {ZROCKET} `»` Fun\n"
+                f" {GAMES} `»` Games\n"
+                f" {ZBAN} `»` Ignore Channels\n"
+                f" {WIFI} `»` Server\n"
+                f" {ZUNMUTE} `»` Voice / TempVoice\n"
+                f" {SEED} `»` Welcomer\n"
+                f" {ZTADA} `»` Giveaway\n"
+                f" {TICKET} `»` Ticket\n"
+                f" {ZPEOPLE} `»` Invite Tracker\n"
+                f" {MESSAGE} `»` Embed Commands\n"
+            ),
+        )
+        embed.add_field(
+            name=f"{ZMODULE} Extra Features",
+            value=(
+                f">>> {CAST} `»` Advance Logging\n"
+                f" {STAR} `»` Vanityroles\n"
+                f" {ZCOUNTING} `»` Counting\n"
+                f" {SYSTEM} `»` J2C\n"
+                f" {ZAI} `»` AI\n"
+                f" {BOOST} `»` Boost\n"
+                f" {LEVEL_UP} `»` Leveling\n"
+                f" {PIN} `»` Sticky\n"
+                f" {THUNDER} `»` Verification\n"
+                f" {LOCK} `»` Encryption\n"
+                f" {MINECRAFT} `»` Minecraft\n"
+                f" {MESSAGE} `»` Joindm\n"
+                f" {ZCIRCLE} `»` Birthday\n"
+                f" {ZCIRCLE_ALT1} `»` Customrole\n"
+            ),
+        )
+        embed.set_footer(text=f"Requested By {ctx.author} | [Support]({serverLink})")
 
-    embed.add_field(
-        name=f"{ZCLOUD} Main Features",
-        value=f">>> \n {ZSAFE} `»` Security\n"
-              f" {ZBOT} `»` Automoderation\n"
-              f" {ZWRENCH} `»` Utility\n"
-              f" {MUSIC} `»` Music\n"
-              f" {WIFI} `»` Autoreact & responder\n"
-              f" {SWORD} `»` Moderation\n"
-              f" {ZPEOPLE} `»` Autorole & Invc\n"
-              f" {ZROCKET} `»` Fun\n"
-              f" {GAMES} `»` Games\n"
-              f" {ZBAN} `»` Ignore Channels\n"
-              f" {WIFI} `»` Server\n"
-              f" {ZUNMUTE} `»` Voice\n"
-              f" {SEED} `»` Welcomer\n"
-              f" {ZTADA} `»` Giveaway\n"
-              f" {TICKET} `»` Ticket {NEW}\n"
-              f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
-              f" {MESSAGE} `»` Embed Commands {NEW}\n"
-    )
+        try:
+            view = vhelp.View(mapping=mapping, ctx=ctx, homeembed=embed, ui=2)
+            await ctx.reply(view=view, mention_author=False)
+        except Exception as exc:
+            # Never leave `.help` completely silent if a Components-V2 category fails.
+            fallback = CV2Embed(
+                title=f"{BotName} Help",
+                description=(
+                    f"Prefix: `{prefix}`\n\n"
+                    f"Use `{prefix}<command>` to run a command.\n"
+                    f"TempVoice: `{prefix}tempvoice setup`\n"
+                    f"Embed: `{prefix}embed`\n\n"
+                    f"Help UI error: `{type(exc).__name__}`"
+                ),
+                color=color,
+            )
+            await ctx.reply(view=fallback, mention_author=False)
 
-    embed.add_field(
-        name=f" {ZMODULE} Extra Features",
-        value=f">>> \n {CAST} `»` Advance Logging\n"
-              f" {STAR} `»` Vanityroles\n"
-              f" {ZCOUNTING} `»` Counting {NEW}\n"
-              f" {SYSTEM} `»` J2C {NEW}\n"
-              f" {ZAI} `»` AI {NEW}\n"
-              f" {BOOST} `»` Boost {NEW}\n"
-              f" {LEVEL_UP} `»` Leveling {NEW}\n"
-              f" {PIN} `»` Sticky {NEW}\n"
-              f" {THUNDER} `»` Verification {NEW}\n"
-              f" {LOCK} `»` Encryption {NEW}\n"
-              f" {MINECRAFT} `»` Minecraft {NEW}\n"
-              f" {MESSAGE} `»` Joindm {NEW}\n"
-              f" {ZCIRCLE} `»` Birthday {NEW}\n"
-              f" {ZCIRCLE_ALT1} `»` Customrole\n"
-    )
+    async def send_command_help(self, command):
+        ctx = self.context
+        if not await self._allowed(ctx):
+            return
+        description = command.help or command.description or "No help provided."
+        embed = CV2Embed(description=f">>> {description}", color=color)
+        aliases = " & ".join(command.aliases)
+        embed.add_field(name="**Alt cmd**", value=f"```{aliases}```" if aliases else "No Alt cmd", inline=False)
+        embed.add_field(name="**Usage**", value=f"```{ctx.prefix}{command.signature}```")
+        embed.set_author(name=f"{command.qualified_name.title()} Command")
+        embed.set_footer(text="<[] = optional | < > = required • Use Prefix Before Commands.")
+        await ctx.reply(view=embed, mention_author=False)
 
-    embed.set_footer(text=f"Requested By {self.context.author} | [Support]({serverLink})")
-    view = vhelp.View(mapping=mapping, ctx=self.context, homeembed=embed, ui=2)
-    await ctx.reply(view=view)
+    def get_command_signature(self, command: commands.Command) -> str:
+        parent = command.full_parent_name
+        aliases = " | ".join(command.aliases)
+        if aliases:
+            name = f"[{command.name} | {aliases}]"
+        else:
+            name = command.name
+        if parent:
+            name = f"{parent} {name}"
+        return f"{name} {command.signature}".strip()
 
-  async def send_command_help(self, command):
-    ctx = self.context
-    check_ignore = await ignore_check().predicate(ctx)
-    check_blacklist = await blacklist_check().predicate(ctx)
-    if not check_blacklist:
-      return
-    if not check_ignore:
-      await self.send_ignore_message(ctx, "command")
-      return
+    async def send_group_help(self, group):
+        ctx = self.context
+        if not await self._allowed(ctx):
+            return
+        entries = [
+            (f"`{ctx.prefix}{cmd.qualified_name}`", cmd.short_doc or "No description available")
+            for cmd in group.commands
+        ]
+        embeds = FieldPagePaginator(
+            entries=entries,
+            title=f"{group.qualified_name.title()} [{len(group.commands)}]",
+            description="< > Duty | [ ] Optional\n",
+            per_page=4,
+        ).get_pages()
+        await Paginator(ctx, embeds).paginate()
 
-    zyrox = f">>> {command.help}" if command.help else '>>> No Help Provided...'
-    embed = CV2Embed(description=f"""{zyrox}""", color=color)
-    alias = ' & '.join(command.aliases)
-    embed.add_field(name="**Alt cmd**", value=f"```{alias}```" if command.aliases else "No Alt cmd", inline=False)
-    embed.add_field(name="**Usage**", value=f"```{self.context.prefix}{command.signature}```\n")
-    embed.set_author(name=f"{command.qualified_name.title()} Command")
-    embed.set_footer(text="<[] = optional | < > = required • Use Prefix Before Commands.")
-    await self.context.reply(view=embed, mention_author=False)
-
-  def get_command_signature(self, command: commands.Command) -> str:
-    parent = command.full_parent_name
-    if len(command.aliases) > 0:
-      aliases = ' | '.join(command.aliases)
-      fmt = f'[{command.name} | {aliases}]'
-      if parent:
-        fmt = f'{parent}'
-      alias = f'[{command.name} | {aliases}]'
-    else:
-      alias = command.name if not parent else f'{parent} {command.name}'
-    return f'{alias} {command.signature}'
-
-  def common_command_formatting(self, embed_like, command):
-    embed_like.title = self.get_command_signature(command)
-    if command.description:
-      embed_like.description = f'{command.description}\n\n{command.help}'
-    else:
-      embed_like.description = command.help or 'No help found...'
-
-  async def send_group_help(self, group):
-    ctx = self.context
-    check_ignore = await ignore_check().predicate(ctx)
-    check_blacklist = await blacklist_check().predicate(ctx)
-    if not check_blacklist:
-      return
-    if not check_ignore:
-      await self.send_ignore_message(ctx, "command")
-      return
-    entries = [
-        (f"`{self.context.prefix}{cmd.qualified_name}`\n", f"{cmd.short_doc if cmd.short_doc else ''}\n\u200b")
-        for cmd in group.commands
-    ]
-    count = len(group.commands)
-    embeds = FieldPagePaginator(entries=entries, title=f"{group.qualified_name.title()} [{count}]", description="< > Duty | [ ] Optional\n", per_page=4).get_pages()
-    paginator = Paginator(ctx, embeds)
-    await paginator.paginate()
-
-  async def send_cog_help(self, cog):
-    ctx = self.context
-    check_ignore = await ignore_check().predicate(ctx)
-    check_blacklist = await blacklist_check().predicate(ctx)
-    if not check_blacklist:
-      return
-    if not check_ignore:
-      await self.send_ignore_message(ctx, "command")
-      return
-    entries = [
-      (f"> `{self.context.prefix}{cmd.qualified_name}`", f"-# Description : {cmd.short_doc if cmd.short_doc else ''}\n\u200b")
-      for cmd in cog.get_commands()
-    ]
-    paginator = Paginator(source=FieldPagePaginator(
-      entries=entries,
-      title=f"{BRAND_NAME}'s {cog.qualified_name.title()} ({len(cog.get_commands())})",
-      description="`<..> Required | [..] Optional`\n\n",
-      color=0xFF0000,
-      per_page=4),
-      ctx=self.context)
-    await paginator.paginate()
+    async def send_cog_help(self, cog):
+        ctx = self.context
+        if not await self._allowed(ctx):
+            return
+        entries = [
+            (f"> `{ctx.prefix}{cmd.qualified_name}`", f"-# Description : {cmd.short_doc or ''}\n\u200b")
+            for cmd in cog.get_commands()
+        ]
+        paginator = Paginator(
+            source=FieldPagePaginator(
+                entries=entries,
+                title=f"{BRAND_NAME}'s {cog.qualified_name.title()} ({len(cog.get_commands())})",
+                description="`<..> Required | [..] Optional`\n\n",
+                color=color,
+                per_page=4,
+            ),
+            ctx=ctx,
+        )
+        await paginator.paginate()
 
 
 class Help(Cog, name="help"):
+    def __init__(self, client: zyrox):
+        self._original_help_command = client.help_command
+        attributes = {
+            "name": "help",
+            "aliases": ["h"],
+            "cooldown": commands.CooldownMapping.from_cooldown(1, 5, commands.BucketType.user),
+            "help": "Shows help about bot, a command, or a category",
+        }
+        client.help_command = HelpCommand(command_attrs=attributes)
+        client.help_command.cog = self
 
-  def __init__(self, client: zyrox):
-    self._original_help_command = client.help_command
-    attributes = {
-      'name': "help",
-      'aliases': ['h'],
-      'cooldown': commands.CooldownMapping.from_cooldown(1, 5, commands.BucketType.user),
-      'help': 'Shows help about bot, a command, or a category'
-    }
-    client.help_command = HelpCommand(command_attrs=attributes)
-    client.help_command.cog = self
-
-  async def cog_unload(self):
-    self.help_command = self._original_help_command
+    async def cog_unload(self):
+        self.help_command = self._original_help_command
