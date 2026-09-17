@@ -4,20 +4,36 @@ Patches the existing Music cog without replacing its UI/commands:
 - connects to several Lavalink v4 nodes
 - keeps retry/resume behavior
 - disables the old 2-minute inactivity disconnect
-- enables autoplay after a successful play so playback can continue
+- accepts direct YouTube / YouTube Music links
+- sends a fresh control panel whenever a track actually starts
 """
 
 import asyncio
 import json
 import os
+import re
 import wavelink
 from discord.ext import commands
+
+
+def _normalize_youtube_url(query: str) -> str:
+    query = query.strip()
+
+    # YouTube Music watch URL -> normal YouTube watch URL.
+    # This preserves the video ID and lets Lavalink's YouTube source resolve it.
+    match = re.fullmatch(r"https?://music\.youtube\.com/watch\?([^\s>]+)", query, re.I)
+    if match:
+        video = re.search(r"(?:^|&)v=([A-Za-z0-9_-]+)", match.group(1), re.I)
+        if video:
+            return f"https://www.youtube.com/watch?v={video.group(1)}"
+
+    return query
 
 
 def _patch_music_class():
     # Import after Wavelink is available, then patch the existing cog before
     # cogs.setup() instantiates Music(bot).
-    from .music import Music
+    from .music import Music, MusicControlView
 
     async def connect_nodes(self) -> None:
         raw = os.getenv("LAVALINK_NODES", "").strip()
@@ -31,8 +47,6 @@ def _patch_music_class():
             except Exception:
                 configs = []
 
-        # Safe fallbacks. Credentials are public node credentials and can be
-        # overridden entirely with LAVALINK_NODES on Render.
         if not configs:
             configs = [
                 {"host": "lavalinkv4.serenetia.com", "port": 443,
@@ -79,19 +93,17 @@ def _patch_music_class():
             print(f"[LightCore Music] Lavalink pool connection error: {exc}")
 
     async def check_inactivity(self, guild_id):
-        # The original ZyroX music cog disconnected after 120 seconds when
-        # alone in a voice channel. LightCore's 24/7 music mode must not do so.
+        # LightCore music should not disconnect just because nobody is speaking.
         return
 
     original_play_source = Music.play_source
 
     async def play_source(self, ctx, query):
+        query = _normalize_youtube_url(query)
         last_error = None
         for attempt in range(3):
             try:
                 await original_play_source(self, ctx, query)
-                # The original method explicitly disables autoplay. Re-enable
-                # it after a successful play so a queue can continue naturally.
                 vc = ctx.voice_client
                 if vc and vc.playing:
                     vc.autoplay = wavelink.AutoPlayMode.enabled
@@ -102,9 +114,42 @@ def _patch_music_class():
         if last_error:
             raise last_error
 
+    async def on_track_end(self, payload: wavelink.TrackEndEventPayload):
+        """Advance playback; the track-start listener below owns the panel."""
+        player = payload.player
+        ctx = getattr(player, "ctx", None)
+        if not player:
+            return
+
+        if player.queue.mode == wavelink.QueueMode.loop:
+            await player.play(payload.track)
+            return
+
+        if not player.queue.is_empty:
+            next_track = await player.queue.get_wait()
+            await player.play(next_track)
+            return
+
+        if player.autoplay == wavelink.AutoPlayMode.enabled:
+            await asyncio.sleep(2)
+            if player.current:
+                return
+            if ctx:
+                try:
+                    await ctx.send("No suitable track found for autoplay.")
+                except Exception:
+                    pass
+            return
+
+        try:
+            await player.disconnect()
+        except Exception:
+            pass
+
     Music.connect_nodes = connect_nodes
     Music.check_inactivity = check_inactivity
     Music.play_source = play_source
+    Music.on_track_end = on_track_end
 
 
 _patch_music_class()
@@ -136,6 +181,21 @@ class Music247(commands.Cog):
                     continue
 
         self.retry_tasks[guild_id] = asyncio.create_task(worker())
+
+    @commands.Cog.listener()
+    async def on_wavelink_track_start(self, payload):
+        """Post a brand-new music control panel for every newly started track."""
+        player = payload.player
+        track = payload.track
+        ctx = getattr(player, "ctx", None)
+        if not player or not track or not ctx:
+            return
+
+        try:
+            from .music import MusicControlView
+            await ctx.send(view=MusicControlView(player, ctx, track, False))
+        except Exception as exc:
+            print(f"[LightCore Music] Could not send track control panel: {exc}")
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(self, payload):
