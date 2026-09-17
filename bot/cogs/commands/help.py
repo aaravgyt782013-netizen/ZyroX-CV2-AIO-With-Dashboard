@@ -37,7 +37,7 @@ class HelpCommand(commands.HelpCommand):
                 await self.send_ignore_message(ctx, "command")
                 return False
         except Exception:
-            # Help must remain available even if an optional ignore/blacklist check fails.
+            # Keep help available if an optional check is unavailable.
             pass
         return True
 
@@ -58,46 +58,49 @@ class HelpCommand(commands.HelpCommand):
         suggestion = f"\nDid you mean `{ctx.prefix}{matches[0]}`?" if matches else ""
         embed = CV2Embed(
             title=f"{BotName} Helper",
-            description=f">>> **Command not found:** `{string}`.{suggestion}",
+            description=f">>> **Ops! Command not found with the name** `{string}`.{suggestion}",
             color=color,
         )
-        await ctx.reply(view=embed, mention_author=False)
+        await ctx.reply(view=embed, mention_author=True)
 
     async def send_bot_help(self, mapping):
         ctx = self.context
         if not await self._allowed(ctx):
             return
 
+        # Keep the original LightCore home page/loading experience.
+        loading_embed = CV2(f"{LOADINGRED} Loading help Menu...")
+        loading_msg = await ctx.reply(view=loading_embed)
+        await asyncio.sleep(2)
+        with suppress(discord.NotFound):
+            await loading_msg.delete()
+
         data = await getConfig(ctx.guild.id) if ctx.guild else {"prefix": "."}
         prefix = data.get("prefix", ".")
 
-        # Build a clean mapping from the commands currently registered with the bot.
+        # Keep Embed and TempVoice available in the category navigation.
         mapping = dict(mapping)
-        for cog in list(mapping.keys()):
-            if cog is None:
-                mapping.pop(cog, None)
-
-        # Explicitly include TempVoice and Embed so their categories appear even when
-        # the loader did not place them in HelpCommand's original mapping.
-        for cog_name in ("TempVoice", "Embed"):
+        for cog_name in ("Embed", "TempVoice"):
             cog = ctx.bot.get_cog(cog_name)
             if cog is not None:
                 mapping[cog] = list(cog.get_commands())
 
+        # ORIGINAL HOME PAGE DESIGN RESTORED.
         embed = CV2Embed(
-            title=f"{BotName} Help",
             description=(
                 f"**{ARROWRED} __Start {BotName} Today__**\n"
+                f"**{ZARROW} Type {prefix}antinuke enable**\n"
                 f"**{ZARROW} Server Prefix:** `{prefix}`\n"
-                f"**{ZARROW} Total Commands:** `{len(set(ctx.bot.walk_commands()))}`\n\n"
-                f"Select a category below to view its commands."
+                f"**{ZARROW} Total Commands:** `{len(set(ctx.bot.walk_commands()))}`\n"
             ),
             color=color,
         )
+
         embed.add_field(
             name=f"{ZCLOUD} Main Features",
             value=(
-                f">>> {ZSAFE} `»` Security\n"
+                f">>> \n"
+                f" {ZSAFE} `»` Security\n"
                 f" {ZBOT} `»` Automoderation\n"
                 f" {ZWRENCH} `»` Utility\n"
                 f" {MUSIC} `»` Music\n"
@@ -111,42 +114,44 @@ class HelpCommand(commands.HelpCommand):
                 f" {ZUNMUTE} `»` Voice / TempVoice\n"
                 f" {SEED} `»` Welcomer\n"
                 f" {ZTADA} `»` Giveaway\n"
-                f" {TICKET} `»` Ticket\n"
-                f" {ZPEOPLE} `»` Invite Tracker\n"
-                f" {MESSAGE} `»` Embed Commands\n"
+                f" {TICKET} `»` Ticket {NEW}\n"
+                f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
+                f" {MESSAGE} `»` Embed Commands {NEW}\n"
             ),
         )
+
         embed.add_field(
-            name=f"{ZMODULE} Extra Features",
+            name=f" {ZMODULE} Extra Features",
             value=(
-                f">>> {CAST} `»` Advance Logging\n"
+                f">>> \n"
+                f" {CAST} `»` Advance Logging\n"
                 f" {STAR} `»` Vanityroles\n"
-                f" {ZCOUNTING} `»` Counting\n"
-                f" {SYSTEM} `»` J2C\n"
-                f" {ZAI} `»` AI\n"
-                f" {BOOST} `»` Boost\n"
-                f" {LEVEL_UP} `»` Leveling\n"
-                f" {PIN} `»` Sticky\n"
-                f" {THUNDER} `»` Verification\n"
-                f" {LOCK} `»` Encryption\n"
-                f" {MINECRAFT} `»` Minecraft\n"
-                f" {MESSAGE} `»` Joindm\n"
-                f" {ZCIRCLE} `»` Birthday\n"
+                f" {ZCOUNTING} `»` Counting {NEW}\n"
+                f" {SYSTEM} `»` J2C {NEW}\n"
+                f" {ZAI} `»` AI {NEW}\n"
+                f" {BOOST} `»` Boost {NEW}\n"
+                f" {LEVEL_UP} `»` Leveling {NEW}\n"
+                f" {PIN} `»` Sticky {NEW}\n"
+                f" {THUNDER} `»` Verification {NEW}\n"
+                f" {LOCK} `»` Encryption {NEW}\n"
+                f" {MINECRAFT} `»` Minecraft {NEW}\n"
+                f" {MESSAGE} `»` Joindm {NEW}\n"
+                f" {ZCIRCLE} `»` Birthday {NEW}\n"
                 f" {ZCIRCLE_ALT1} `»` Customrole\n"
             ),
         )
+
         embed.set_footer(text=f"Requested By {ctx.author} | [Support]({serverLink})")
 
         try:
             view = vhelp.View(mapping=mapping, ctx=ctx, homeembed=embed, ui=2)
             await ctx.reply(view=view, mention_author=False)
         except Exception as exc:
-            # Never leave `.help` completely silent if a Components-V2 category fails.
             fallback = CV2Embed(
                 title=f"{BotName} Help",
                 description=(
                     f"Prefix: `{prefix}`\n\n"
-                    f"Use `{prefix}<command>` to run a command.\n"
+                    f"Use `{prefix}<command>` to run the bot.\n"
                     f"TempVoice: `{prefix}tempvoice setup`\n"
                     f"Embed: `{prefix}embed`\n\n"
                     f"Help UI error: `{type(exc).__name__}`"
