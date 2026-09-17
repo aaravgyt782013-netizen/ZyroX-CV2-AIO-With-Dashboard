@@ -5,7 +5,7 @@ Patches the existing Music cog without replacing its UI/commands:
 - keeps retry/resume behavior
 - disables the old 2-minute inactivity disconnect
 - accepts direct YouTube / YouTube Music links
-- sends a fresh control panel whenever a track actually starts
+- sends one fresh control panel whenever a track actually starts
 """
 
 import asyncio
@@ -18,22 +18,18 @@ from discord.ext import commands
 
 def _normalize_youtube_url(query: str) -> str:
     query = query.strip()
-
-    # YouTube Music watch URL -> normal YouTube watch URL.
-    # This preserves the video ID and lets Lavalink's YouTube source resolve it.
     match = re.fullmatch(r"https?://music\.youtube\.com/watch\?([^\s>]+)", query, re.I)
     if match:
         video = re.search(r"(?:^|&)v=([A-Za-z0-9_-]+)", match.group(1), re.I)
         if video:
             return f"https://www.youtube.com/watch?v={video.group(1)}"
-
     return query
 
 
 def _patch_music_class():
     # Import after Wavelink is available, then patch the existing cog before
     # cogs.setup() instantiates Music(bot).
-    from .music import Music, MusicControlView
+    from .music import Music
 
     async def connect_nodes(self) -> None:
         raw = os.getenv("LAVALINK_NODES", "").strip()
@@ -83,11 +79,7 @@ def _patch_music_class():
             return
 
         try:
-            await wavelink.Pool.connect(
-                nodes=nodes,
-                client=self.client,
-                cache_capacity=None,
-            )
+            await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
             print(f"[LightCore Music] Lavalink pool started with {len(nodes)} nodes.")
         except Exception as exc:
             print(f"[LightCore Music] Lavalink pool connection error: {exc}")
@@ -146,10 +138,17 @@ def _patch_music_class():
         except Exception:
             pass
 
+    async def display_player_embed(self, player, track, ctx, autoplay=False):
+        # The Wavelink track-start listener below sends the panel. Keeping this
+        # method empty prevents the original .play/queue code from sending a
+        # duplicate panel before/after the start event.
+        return
+
     Music.connect_nodes = connect_nodes
     Music.check_inactivity = check_inactivity
     Music.play_source = play_source
     Music.on_track_end = on_track_end
+    Music.display_player_embed = display_player_embed
 
 
 _patch_music_class()
@@ -184,7 +183,7 @@ class Music247(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, payload):
-        """Post a brand-new music control panel for every newly started track."""
+        """Post one brand-new music control panel for every newly started track."""
         player = payload.player
         track = payload.track
         ctx = getattr(player, "ctx", None)
