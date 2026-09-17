@@ -1,14 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║                                                                  ║
-# ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
-# ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
-# ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
+# ║                         LIGHTCORE                                ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from __future__ import annotations
@@ -88,7 +79,6 @@ from .events.Errors import Errors
 from .events.on_guild import Guild
 from .events.autorole import Autorole2
 from .events.auto import Autorole
-from .events.greet2 import greet
 from .events.mention import Mention
 from .events.react import React
 from .events.autoreact import AutoReactListener
@@ -172,17 +162,6 @@ from .moderation.snipe import Snipe
 from utils.config import BotName
 
 async def setup(bot: zyrox):
-    cogs_to_load = [
-        Help, General, Moderation, Automod, Welcomer, Fun, Games, Extra,
-        Voice, Owner, Customrole, afk, Embed, Media, Ignore, TicketCog, Logging,
-        Invcrole, Steal, Timer, Blacklist, Block, Nightmode, Badges, Antinuke,
-        Whitelist, Unwhitelist, Extraowner, Blackjack, Slots, Stats, Status,
-        NoPrefix, FilterCog, AutoReaction, AutoReactListener, Ban, Unban, Mute,
-        Unmute, Lock, Unlock, Hide, Unhide, Kick, Warn, Role, Message, Moderation,
-        TopCheck, Snipe, Global, QR, VanityRoles, ReactionRoles, Messages,
-        TranslateCog, FastGreet, Jail, inviteTracker, Counting, AI
-    ]
-
     await bot.add_cog(Help(bot))
     await bot.add_cog(General(bot))
     await bot.add_cog(Music(bot))
@@ -276,5 +255,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(_joindm(bot))
     await bot.add_cog(_birth(bot))
 
+    # Event listeners must be registered as cogs as well.
+    await bot.add_cog(Mention(bot))
     await bot.add_cog(Guild(bot))
     await bot.add_cog(Errors(bot))
