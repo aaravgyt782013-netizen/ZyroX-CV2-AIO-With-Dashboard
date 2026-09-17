@@ -28,6 +28,30 @@ class LimitModal(discord.ui.Modal, title="Set VC limit"):
         await vc.edit(user_limit=n)
         await interaction.response.send_message(f"👥 Limit set to **{n or 'unlimited'}**.",ephemeral=True)
 
+class TransferSelect(discord.ui.View):
+    def __init__(self,cog,interaction): super().__init__(timeout=120); self.cog=cog; self.owner=interaction.user
+    @discord.ui.select(cls=discord.ui.UserSelect,placeholder="Select the new VC owner",min_values=1,max_values=1)
+    async def select(self,interaction,select):
+        if interaction.user.id!=self.owner.id:return await interaction.response.send_message("❌ Only the current owner can transfer ownership.",ephemeral=True)
+        vc=await self.cog.owned_vc(interaction)
+        if not vc:return
+        member=select.values[0]
+        if member.bot:return await interaction.response.send_message("❌ Choose a human member.",ephemeral=True)
+        await self.cog.set_owner(vc.id,member.id)
+        await vc.set_permissions(member,manage_channels=True,move_members=True,connect=True)
+        await interaction.response.send_message(f"👑 Ownership transferred to {member.mention}.",ephemeral=True)
+
+class PermitSelect(discord.ui.View):
+    def __init__(self,cog,interaction): super().__init__(timeout=120); self.cog=cog; self.owner=interaction.user
+    @discord.ui.select(cls=discord.ui.UserSelect,placeholder="Select a member to permit",min_values=1,max_values=1)
+    async def select(self,interaction,select):
+        if interaction.user.id!=self.owner.id:return await interaction.response.send_message("❌ Only the VC owner can permit members.",ephemeral=True)
+        vc=await self.cog.owned_vc(interaction)
+        if not vc:return
+        member=select.values[0]
+        await vc.set_permissions(member,connect=True,view_channel=True)
+        await interaction.response.send_message(f"✅ {member.mention} can now join your VC.",ephemeral=True)
+
 class TempVoicePanel(discord.ui.View):
     def __init__(self,cog): super().__init__(timeout=None); self.cog=cog
     async def vc(self,i): return await self.cog.owned_vc(i)
@@ -53,14 +77,35 @@ class TempVoicePanel(discord.ui.View):
     @discord.ui.button(label="Limit",emoji="👥",style=discord.ButtonStyle.primary,row=1,custom_id="tv:limit")
     async def limit(self,i,b):
         if await self.vc(i): await i.response.send_modal(LimitModal(self.cog))
-    @discord.ui.button(label="Claim",emoji="👑",style=discord.ButtonStyle.primary,row=1,custom_id="tv:claim")
+    @discord.ui.button(label="Transfer",emoji="👑",style=discord.ButtonStyle.primary,row=1,custom_id="tv:transfer")
+    async def transfer(self,i,b):
+        if await self.vc(i): await i.response.send_message("Select the new owner:",view=TransferSelect(self.cog,i),ephemeral=True)
+    @discord.ui.button(label="Permit",emoji="✅",style=discord.ButtonStyle.primary,row=2,custom_id="tv:permit")
+    async def permit(self,i,b):
+        if await self.vc(i): await i.response.send_message("Select a member to permit:",view=PermitSelect(self.cog,i),ephemeral=True)
+    @discord.ui.button(label="Info",emoji="ℹ️",style=discord.ButtonStyle.secondary,row=2,custom_id="tv:info")
+    async def info(self,i,b):
+        c=await self.vc(i)
+        if c:
+            await i.response.send_message(f"📊 **{c.name}**\n👥 Members: **{len(c.members)}**\n🎚️ Limit: **{c.user_limit or 'Unlimited'}**\n🔊 Bitrate: **{c.bitrate // 1000}kbps**",ephemeral=True)
+    @discord.ui.button(label="Disconnect",emoji="🚪",style=discord.ButtonStyle.secondary,row=2,custom_id="tv:disconnect")
+    async def disconnect(self,i,b):
+        c=await self.vc(i)
+        if not c:return
+        others=[m for m in c.members if m.id!=i.user.id and not m.bot]
+        if not others:return await i.response.send_message("ℹ️ Nobody else is in your VC.",ephemeral=True)
+        for m in others:
+            try: await m.move_to(None)
+            except (discord.Forbidden,discord.HTTPException): pass
+        await i.response.send_message(f"🚪 Disconnected **{len(others)}** member(s).",ephemeral=True)
+    @discord.ui.button(label="Claim",emoji="🫴",style=discord.ButtonStyle.primary,row=3,custom_id="tv:claim")
     async def claim(self,i,b):
         voice=i.user.voice
         if not voice or voice.channel.id not in self.cog.channels:return await i.response.send_message("❌ Join a temporary VC first.",ephemeral=True)
         data=self.cog.channels[voice.channel.id]; owner=i.guild.get_member(data["owner_id"])
         if owner and owner.voice and owner.voice.channel==voice.channel:return await i.response.send_message("❌ Current owner is still inside.",ephemeral=True)
-        await self.cog.set_owner(voice.channel.id,i.user.id); await i.response.send_message("👑 VC claimed.",ephemeral=True)
-    @discord.ui.button(label="Delete",emoji="🗑️",style=discord.ButtonStyle.danger,row=1,custom_id="tv:delete")
+        await self.cog.set_owner(voice.channel.id,i.user.id); await i.response.send_message("🫴 VC claimed.",ephemeral=True)
+    @discord.ui.button(label="Delete",emoji="🗑️",style=discord.ButtonStyle.danger,row=3,custom_id="tv:delete")
     async def delete(self,i,b):
         c=await self.vc(i)
         if c: await self.cog.remove_channel(c.id); await c.delete(); await i.response.send_message("🗑️ VC deleted.",ephemeral=True)
@@ -82,7 +127,7 @@ class CategorySelect(discord.ui.View):
     async def select(self,i,select):
         cat=i.guild.get_channel(int(select.values[0]))
         if not isinstance(cat,discord.CategoryChannel):return await i.response.send_message("❌ Invalid category.",ephemeral=True)
-        await self.cog.finish_setup(i,cat=cat,existing=None)
+        await i.response.send_message("Now choose the **text channel** where the TempVoice interface should be posted:",view=TextSelect(self.cog,self.ctx,cat),ephemeral=True)
 
 class VoiceSelect(discord.ui.View):
     def __init__(self,cog,ctx): super().__init__(timeout=300); self.cog=cog; self.ctx=ctx
@@ -90,7 +135,20 @@ class VoiceSelect(discord.ui.View):
     async def select(self,i,select):
         ch=i.guild.get_channel(int(select.values[0]))
         if not isinstance(ch,discord.VoiceChannel):return await i.response.send_message("❌ Invalid voice channel.",ephemeral=True)
-        await self.cog.finish_setup(i,cat=ch.category,existing=ch)
+        await i.response.send_message("Now choose the **text channel** where the TempVoice interface should be posted:",view=TextSelect(self.cog,self.ctx,ch.category,existing=ch),ephemeral=True)
+
+class TextSelect(discord.ui.View):
+    def __init__(self,cog,ctx,cat,existing=None):
+        super().__init__(timeout=300); self.cog=cog; self.ctx=ctx; self.cat=cat; self.existing=existing
+        channels=[c for c in ctx.guild.text_channels if c.permissions_for(ctx.guild.me).send_messages]
+        opts=[discord.SelectOption(label=c.name[:100],value=str(c.id),description="Use this channel for the TempVoice interface") for c in channels[:25]]
+        self.remove_item(self.select)
+        self.add_item(discord.ui.Select(placeholder="Select the interface text channel",options=opts,min_values=1,max_values=1,custom_id="tv:interface") )
+        self.children[0].callback=self.choose
+    async def choose(self,i,select):
+        ch=i.guild.get_channel(int(select.values[0]))
+        if not isinstance(ch,discord.TextChannel):return await i.response.send_message("❌ Invalid text channel.",ephemeral=True)
+        await self.cog.finish_setup(i,self.cat,self.existing,ch)
 
 class TempVoice(commands.Cog):
     def __init__(self,bot):
@@ -125,15 +183,17 @@ class TempVoice(commands.Cog):
         if not v or v.channel.id not in self.channels:return await i.response.send_message("❌ Join your temporary VC first.",ephemeral=True) or None
         if self.channels[v.channel.id]["owner_id"]!=i.user.id:return await i.response.send_message("❌ You don't own this VC.",ephemeral=True) or None
         return v.channel
-    async def finish_setup(self,i,cat,existing):
+    async def lock_interface(self,ch):
+        me=ch.guild.me
+        await ch.set_permissions(ch.guild.default_role,view_channel=True,send_messages=False,add_reactions=False)
+        if me: await ch.set_permissions(me,view_channel=True,send_messages=True,send_messages_in_threads=True,embed_links=True,attach_files=True)
+    async def finish_setup(self,i,cat,existing,interface):
         if i.guild.id in self.setup:return await i.response.send_message("❌ TempVoice is already configured.",ephemeral=True)
-        if existing:
-            join=existing
-        else:
-            join=await i.guild.create_voice_channel("➕ Join to Create",category=cat)
-        panel=await i.channel.send("## 🎙️ TempVoice\nUse the buttons below to configure the temporary voice channel you currently own.",view=TempVoicePanel(self))
-        d={"join_id":join.id,"category_id":cat.id if cat else (join.category.id if join.category else 0),"panel_channel_id":i.channel.id,"panel_message_id":panel.id};self.setup[i.guild.id]=d;await self.save_setup(i.guild.id,d)
-        await i.response.send_message(f"✅ TempVoice configured! Join {join.mention} to create your personal VC.\n📋 Interface: {panel.jump_url}",ephemeral=True)
+        join=existing or await i.guild.create_voice_channel("➕ Join to Create",category=cat)
+        panel=await interface.send("## 🎙️ TempVoice\nManage the temporary voice channel you currently own using the controls below.\n\n🔒 Lock  •  🔓 Unlock  •  👁️ Hide  •  👀 Show\n✏️ Rename  •  👥 Limit  •  👑 Transfer  •  ✅ Permit\nℹ️ Info  •  🚪 Disconnect  •  🫴 Claim  •  🗑️ Delete",view=TempVoicePanel(self))
+        await self.lock_interface(interface)
+        d={"join_id":join.id,"category_id":join.category.id if join.category else 0,"panel_channel_id":interface.id,"panel_message_id":panel.id};self.setup[i.guild.id]=d;await self.save_setup(i.guild.id,d)
+        await i.response.send_message(f"✅ TempVoice configured!\n🎙️ Join-to-create: {join.mention}\n📋 Interface: {interface.mention}\n🔒 Members cannot send messages in the interface channel.",ephemeral=True)
     @commands.group(name="tempvoice",aliases=["tv"],invoke_without_command=True)
     @commands.guild_only()
     async def tempvoice(self,ctx):await ctx.send(f"Use `{ctx.prefix}tempvoice setup` to configure TempVoice.")
@@ -169,7 +229,10 @@ class TempVoice(commands.Cog):
         if after.channel and after.channel.id==d["join_id"]:
             cat=member.guild.get_channel(d["category_id"])
             if cat:
-                vc=await member.guild.create_voice_channel(f"{member.display_name}'s VC",category=cat);await self.save_channel(vc.id,member.guild.id,member.id);await vc.set_permissions(member,manage_channels=True,move_members=True,connect=True);await member.move_to(vc)
+                vc=await member.guild.create_voice_channel(f"{member.display_name}'s VC",category=cat)
+                await self.save_channel(vc.id,member.guild.id,member.id)
+                await vc.set_permissions(member,manage_channels=True,move_members=True,connect=True)
+                await member.move_to(vc)
         if before.channel and before.channel.id in self.channels and not before.channel.members:
             cid=before.channel.id;await self.remove_channel(cid)
             try:await before.channel.delete()
