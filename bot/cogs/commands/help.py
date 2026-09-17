@@ -37,7 +37,6 @@ class HelpCommand(commands.HelpCommand):
                 await self.send_ignore_message(ctx, "command")
                 return False
         except Exception:
-            # Keep help available if an optional check is unavailable.
             pass
         return True
 
@@ -68,7 +67,6 @@ class HelpCommand(commands.HelpCommand):
         if not await self._allowed(ctx):
             return
 
-        # Keep the original LightCore home page/loading experience.
         loading_embed = CV2(f"{LOADINGRED} Loading help Menu...")
         loading_msg = await ctx.reply(view=loading_embed)
         await asyncio.sleep(2)
@@ -78,14 +76,15 @@ class HelpCommand(commands.HelpCommand):
         data = await getConfig(ctx.guild.id) if ctx.guild else {"prefix": "."}
         prefix = data.get("prefix", ".")
 
-        # Keep Embed and TempVoice available in the category navigation.
+        # Keep the original category system, while ensuring the newly added
+        # Embed and TempVoice categories are available when those cogs exist.
         mapping = dict(mapping)
         for cog_name in ("Embed", "TempVoice"):
             cog = ctx.bot.get_cog(cog_name)
             if cog is not None:
                 mapping[cog] = list(cog.get_commands())
 
-        # ORIGINAL HOME PAGE DESIGN RESTORED.
+        # This is the original LightCore home page layout/content.
         embed = CV2Embed(
             description=(
                 f"**{ARROWRED} __Start {BotName} Today__**\n"
@@ -93,52 +92,46 @@ class HelpCommand(commands.HelpCommand):
                 f"**{ZARROW} Server Prefix:** `{prefix}`\n"
                 f"**{ZARROW} Total Commands:** `{len(set(ctx.bot.walk_commands()))}`\n"
             ),
-            color=color,
+            color=0xFF0000,
         )
 
         embed.add_field(
             name=f"{ZCLOUD} Main Features",
-            value=(
-                f">>> \n"
-                f" {ZSAFE} `»` Security\n"
-                f" {ZBOT} `»` Automoderation\n"
-                f" {ZWRENCH} `»` Utility\n"
-                f" {MUSIC} `»` Music\n"
-                f" {WIFI} `»` Autoreact & responder\n"
-                f" {SWORD} `»` Moderation\n"
-                f" {ZPEOPLE} `»` Autorole & Invc\n"
-                f" {ZROCKET} `»` Fun\n"
-                f" {GAMES} `»` Games\n"
-                f" {ZBAN} `»` Ignore Channels\n"
-                f" {WIFI} `»` Server\n"
-                f" {ZUNMUTE} `»` Voice / TempVoice\n"
-                f" {SEED} `»` Welcomer\n"
-                f" {ZTADA} `»` Giveaway\n"
-                f" {TICKET} `»` Ticket {NEW}\n"
-                f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
-                f" {MESSAGE} `»` Embed Commands {NEW}\n"
-            ),
+            value=f">>> \n {ZSAFE} `»` Security\n"
+                  f" {ZBOT} `»` Automoderation\n"
+                  f" {ZWRENCH} `»` Utility\n"
+                  f" {MUSIC} `»` Music\n"
+                  f" {WIFI} `»` Autoreact & responder\n"
+                  f" {SWORD} `»` Moderation\n"
+                  f" {ZPEOPLE} `»` Autorole & Invc\n"
+                  f" {ZROCKET} `»` Fun\n"
+                  f" {GAMES} `»` Games\n"
+                  f" {ZBAN} `»` Ignore Channels\n"
+                  f" {WIFI} `»` Server\n"
+                  f" {ZUNMUTE} `»` Voice\n"
+                  f" {SEED} `»` Welcomer\n"
+                  f" {ZTADA} `»` Giveaway\n"
+                  f" {TICKET} `»` Ticket {NEW}\n"
+                  f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
+                  f" {MESSAGE} `»` Embed Commands {NEW}\n"
         )
 
         embed.add_field(
             name=f" {ZMODULE} Extra Features",
-            value=(
-                f">>> \n"
-                f" {CAST} `»` Advance Logging\n"
-                f" {STAR} `»` Vanityroles\n"
-                f" {ZCOUNTING} `»` Counting {NEW}\n"
-                f" {SYSTEM} `»` J2C {NEW}\n"
-                f" {ZAI} `»` AI {NEW}\n"
-                f" {BOOST} `»` Boost {NEW}\n"
-                f" {LEVEL_UP} `»` Leveling {NEW}\n"
-                f" {PIN} `»` Sticky {NEW}\n"
-                f" {THUNDER} `»` Verification {NEW}\n"
-                f" {LOCK} `»` Encryption {NEW}\n"
-                f" {MINECRAFT} `»` Minecraft {NEW}\n"
-                f" {MESSAGE} `»` Joindm {NEW}\n"
-                f" {ZCIRCLE} `»` Birthday {NEW}\n"
-                f" {ZCIRCLE_ALT1} `»` Customrole\n"
-            ),
+            value=f">>> \n {CAST} `»` Advance Logging\n"
+                  f" {STAR} `»` Vanityroles\n"
+                  f" {ZCOUNTING} `»` Counting {NEW}\n"
+                  f" {SYSTEM} `»` J2C {NEW}\n"
+                  f" {ZAI} `»` AI {NEW}\n"
+                  f" {BOOST} `»` Boost {NEW}\n"
+                  f" {LEVEL_UP} `»` Leveling {NEW}\n"
+                  f" {PIN} `»` Sticky {NEW}\n"
+                  f" {THUNDER} `»` Verification {NEW}\n"
+                  f" {LOCK} `»` Encryption {NEW}\n"
+                  f" {MINECRAFT} `»` Minecraft {NEW}\n"
+                  f" {MESSAGE} `»` Joindm {NEW}\n"
+                  f" {ZCIRCLE} `»` Birthday {NEW}\n"
+                  f" {ZCIRCLE_ALT1} `»` Customrole\n"
         )
 
         embed.set_footer(text=f"Requested By {ctx.author} | [Support]({serverLink})")
