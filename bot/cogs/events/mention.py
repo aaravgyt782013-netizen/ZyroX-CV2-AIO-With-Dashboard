@@ -48,7 +48,6 @@ class MentionSelectView(LayoutView):
                 f"___Type `{self.prefix}help` for more information.___"
             )
         elif selected == "developer":
-            # Keep the Developer section, but do not expose owner-only commands.
             content = (
                 "## Developer\n"
                 "**Developer:** `@aaravg7820133.exe`\n\n"
@@ -73,6 +72,13 @@ class Mention(commands.Cog):
             from ..commands.tempvoice import TempVoice
             if bot.get_cog("TempVoice") is None:
                 bot.loop.create_task(bot.add_cog(TempVoice(bot)))
+
+            # Install the reliable Join-to-Create event handler after TempVoice
+            # is registered. It removes the older event listener to prevent
+            # duplicate temporary channels.
+            from ..commands.tempvoice_event_fix import TempVoiceEventFix
+            if bot.get_cog("TempVoiceEventFix") is None:
+                bot.loop.create_task(bot.add_cog(TempVoiceEventFix(bot)))
         except Exception as exc:
             print(f"TempVoice registration error: {exc}")
 
