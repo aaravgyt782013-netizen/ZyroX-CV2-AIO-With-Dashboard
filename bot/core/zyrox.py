@@ -1,4 +1,4 @@
-from __future__
+from __future__ import annotations
 from discord.ext import commands, tasks
 import discord
 import aiohttp
