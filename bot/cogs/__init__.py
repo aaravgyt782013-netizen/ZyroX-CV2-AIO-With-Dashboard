@@ -20,6 +20,7 @@ from colorama import Fore, Style, init
 from .commands.help import Help
 from .commands.general import General
 from .commands.music import Music
+from .commands.music_24_7 import Music247
 from .commands.automod import Automod
 from .commands.welcome import Welcomer
 from .commands.fun import Fun
@@ -204,6 +205,7 @@ async def setup(bot: zyrox):
   await bot.add_cog(Help(bot))
   await bot.add_cog(General(bot))
   await bot.add_cog(Music(bot))
+  await bot.add_cog(Music247(bot))
   await bot.add_cog(Automod(bot))
   await bot.add_cog(Welcomer(bot))
   await bot.add_cog(Fun(bot))
@@ -298,79 +300,3 @@ async def setup(bot: zyrox):
   #await bot.add_cog(AutoBlacklist(bot))
   await bot.add_cog(Guild(bot))
   await bot.add_cog(Errors(bot))
-  await bot.add_cog(Autorole2(bot))
-  await bot.add_cog(Autorole(bot))
-  await bot.add_cog(greet(bot))
-  await bot.add_cog(AutoResponder(bot))
-  await bot.add_cog(Mention(bot))
-  await bot.add_cog(AutoRole(bot))
-  await bot.add_cog(React(bot))
-  await bot.add_cog(AutoReaction(bot))
-  await bot.add_cog(AutoReactListener(bot))
-  await bot.add_cog(NotifCommands(bot))
-  await bot.add_cog(StickyMessageListener(bot))
-  await bot.add_cog(AIResponses(bot))
-
-
-  await bot.add_cog(AntiMemberUpdate(bot))
-  await bot.add_cog(AntiBan(bot))
-  await bot.add_cog(AntiBotAdd(bot))
-  await bot.add_cog(AntiChannelCreate(bot))
-  await bot.add_cog(AntiChannelDelete(bot))
-  await bot.add_cog(AntiChannelUpdate(bot))
-  await bot.add_cog(AntiEveryone(bot))
-  await bot.add_cog(AntiGuildUpdate(bot))
-  await bot.add_cog(AntiIntegration(bot))
-  await bot.add_cog(AntiKick(bot))
-  await bot.add_cog(AntiPrune(bot))
-  await bot.add_cog(AntiRoleCreate(bot))
-  await bot.add_cog(AntiRoleDelete(bot))
-  await bot.add_cog(AntiRoleUpdate(bot))
-  await bot.add_cog(AntiWebhookUpdate(bot))
-  await bot.add_cog(AntiWebhookCreate(bot))
-  await bot.add_cog(AntiWebhookDelete(bot))
-
-
-#Extra Optional Events 
-
-  #await bot.add_cog(AntiEmojiCreate(bot))
-  #await bot.add_cog(AntiEmojiDelete(bot))
-  #await bot.add_cog(AntiEmojiUpdate(bot))
-  #await bot.add_cog(AntiSticker(bot))
-  #await bot.add_cog(AntiUnban(bot))
-
-
-  await bot.add_cog(AntiSpam(bot))
-  await bot.add_cog(AntiCaps(bot))
-  await bot.add_cog(AntiInvite(bot))
-  await bot.add_cog(AntiLink(bot))
-  await bot.add_cog(AntiMassMention(bot))
-  await bot.add_cog(AntiEmojiSpam(bot))
-
-
-
-
-
-
-
-  await bot.add_cog(Ban(bot))
-  await bot.add_cog(Unban(bot))
-  await bot.add_cog(Mute(bot))
-  await bot.add_cog(Unmute(bot))
-  await bot.add_cog(Lock(bot))
-  await bot.add_cog(Unlock(bot))
-  await bot.add_cog(Hide(bot))
-  await bot.add_cog(Unhide(bot))
-  await bot.add_cog(Kick(bot))
-  await bot.add_cog(Warn(bot))
-  await bot.add_cog(Role(bot))
-  await bot.add_cog(Message(bot))
-  await bot.add_cog(Moderation(bot))
-  await bot.add_cog(TopCheck(bot))
-  await bot.add_cog(Snipe(bot))
-  
-
-
-  for cog in cogs_to_load:
-    print(Fore.RED + Style.BRIGHT + f"Loaded cog: {cog.__name__}")
-  print(Fore.RED + Style.BRIGHT + f"All {BotName} Cogs loaded successfully.")
