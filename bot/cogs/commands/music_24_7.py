@@ -1,11 +1,7 @@
 """LightCore music reliability layer.
 
-Patches the existing Music cog without replacing its UI/commands:
-- connects to several Lavalink v4 nodes
-- keeps retry/resume behavior
-- disables the old 2-minute inactivity disconnect
-- accepts direct YouTube / YouTube Music links
-- sends one fresh control panel whenever a track actually starts
+Adds resilient Lavalink handling, direct YouTube/YouTube Music URL support,
+and a fresh control panel whenever a new track starts.
 """
 
 import asyncio
@@ -27,14 +23,11 @@ def _normalize_youtube_url(query: str) -> str:
 
 
 def _patch_music_class():
-    # Import after Wavelink is available, then patch the existing cog before
-    # cogs.setup() instantiates Music(bot).
     from .music import Music
 
     async def connect_nodes(self) -> None:
         raw = os.getenv("LAVALINK_NODES", "").strip()
         configs = []
-
         if raw:
             try:
                 parsed = json.loads(raw)
@@ -61,23 +54,20 @@ def _patch_music_class():
                 password = str(item["password"])
                 secure = bool(item.get("secure", port == 443))
                 uri = f"https://{host}:{port}" if secure else f"http://{host}:{port}"
-                nodes.append(
-                    wavelink.Node(
-                        identifier=f"lightcore-{index + 1}",
-                        uri=uri,
-                        password=password,
-                        retries=None,
-                        resume_timeout=180,
-                        inactive_player_timeout=None,
-                    )
-                )
+                nodes.append(wavelink.Node(
+                    identifier=f"lightcore-{index + 1}",
+                    uri=uri,
+                    password=password,
+                    retries=None,
+                    resume_timeout=180,
+                    inactive_player_timeout=None,
+                ))
             except Exception as exc:
                 print(f"[LightCore Music] Invalid Lavalink node config: {exc}")
 
         if not nodes:
             print("[LightCore Music] No Lavalink nodes configured.")
             return
-
         try:
             await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
             print(f"[LightCore Music] Lavalink pool started with {len(nodes)} nodes.")
@@ -85,7 +75,6 @@ def _patch_music_class():
             print(f"[LightCore Music] Lavalink pool connection error: {exc}")
 
     async def check_inactivity(self, guild_id):
-        # LightCore music should not disconnect just because nobody is speaking.
         return
 
     original_play_source = Music.play_source
@@ -107,48 +96,36 @@ def _patch_music_class():
             raise last_error
 
     async def on_track_end(self, payload: wavelink.TrackEndEventPayload):
-        """Advance playback; the track-start listener below owns the panel."""
         player = payload.player
-        ctx = getattr(player, "ctx", None)
         if not player:
             return
-
         if player.queue.mode == wavelink.QueueMode.loop:
             await player.play(payload.track)
             return
-
         if not player.queue.is_empty:
             next_track = await player.queue.get_wait()
             await player.play(next_track)
             return
-
         if player.autoplay == wavelink.AutoPlayMode.enabled:
             await asyncio.sleep(2)
             if player.current:
                 return
+            ctx = getattr(player, "ctx", None)
             if ctx:
                 try:
                     await ctx.send("No suitable track found for autoplay.")
                 except Exception:
                     pass
             return
-
         try:
             await player.disconnect()
         except Exception:
             pass
 
-    async def display_player_embed(self, player, track, ctx, autoplay=False):
-        # The Wavelink track-start listener below sends the panel. Keeping this
-        # method empty prevents the original .play/queue code from sending a
-        # duplicate panel before/after the start event.
-        return
-
     Music.connect_nodes = connect_nodes
     Music.check_inactivity = check_inactivity
     Music.play_source = play_source
     Music.on_track_end = on_track_end
-    Music.display_player_embed = display_player_embed
 
 
 _patch_music_class()
@@ -158,6 +135,32 @@ class Music247(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.retry_tasks = {}
+
+    @staticmethod
+    def _beta_panel(view):
+        # The actual panel is built by MusicControlView; this helper is kept
+        # intentionally small so the existing controls remain unchanged.
+        return view
+
+    @commands.Cog.listener()
+    async def on_wavelink_track_start(self, payload):
+        player = payload.player
+        track = payload.track
+        ctx = getattr(player, "ctx", None)
+        if not player or not track or not ctx:
+            return
+        try:
+            from .music import MusicControlView
+            await ctx.send(view=MusicControlView(player, ctx, track, False, beta_testing=True))
+        except TypeError:
+            # Backward-compatible fallback if the base view has not yet been
+            # updated with the beta_testing parameter.
+            try:
+                await ctx.send(view=MusicControlView(player, ctx, track, False))
+            except Exception as exc:
+                print(f"[LightCore Music] Could not send track control panel: {exc}")
+        except Exception as exc:
+            print(f"[LightCore Music] Could not send track control panel: {exc}")
 
     async def _recover(self, player: wavelink.Player, track=None):
         if not player or not player.guild:
@@ -180,21 +183,6 @@ class Music247(commands.Cog):
                     continue
 
         self.retry_tasks[guild_id] = asyncio.create_task(worker())
-
-    @commands.Cog.listener()
-    async def on_wavelink_track_start(self, payload):
-        """Post one brand-new music control panel for every newly started track."""
-        player = payload.player
-        track = payload.track
-        ctx = getattr(player, "ctx", None)
-        if not player or not track or not ctx:
-            return
-
-        try:
-            from .music import MusicControlView
-            await ctx.send(view=MusicControlView(player, ctx, track, False))
-        except Exception as exc:
-            print(f"[LightCore Music] Could not send track control panel: {exc}")
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(self, payload):
