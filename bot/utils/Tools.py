@@ -67,7 +67,14 @@ async def getConfig(guildID):
     async with db.execute("SELECT prefix FROM prefixes WHERE guild_id = ?", (guildID,)) as cursor:
       row = await cursor.fetchone()
       if row:
-        return {"prefix": row[0]}
+        prefix = row[0]
+        # `>` was the old LightCore/ZyroX default. Treat it as legacy default,
+        # while preserving every other explicitly configured per-server prefix.
+        if prefix == ">":
+          prefix = "."
+          await db.execute("UPDATE prefixes SET prefix = ? WHERE guild_id = ?", (prefix, guildID))
+          await db.commit()
+        return {"prefix": prefix}
       else:
         defaultConfig = {"prefix": "."}
         await updateConfig(guildID, defaultConfig)
