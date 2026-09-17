@@ -2,13 +2,9 @@
 # ║                                                                  ║
 # ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
 # ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
+# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀░░░▀▀▀░░▀░░▀▀▀                     ║
 # ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
+# ║            © 2026 LightCore — All Rights Reserved               ║
 # ║                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
@@ -95,14 +91,11 @@ class HelpCommand(commands.HelpCommand):
       await self.send_ignore_message(ctx, "command")
       return
 
-    # Show loading message
     loading_embed = CV2(f"{LOADINGRED} Loading help Menu...")
     loading_msg = await ctx.reply(view=loading_embed)
 
-    # Wait 2 seconds
     await asyncio.sleep(2)
 
-    # Delete loading message
     with suppress(discord.NotFound):
       await loading_msg.delete()
 
@@ -112,32 +105,32 @@ class HelpCommand(commands.HelpCommand):
 
     embed = CV2Embed(
         description=(
-         f"**{ARROWRED} __Start {BotName} Today__**\n"        
+         f"**{ARROWRED} __Start {BotName} Today__**\n"
          f"**{ZARROW} Type {prefix}antinuke enable**\n"
          f"**{ZARROW} Server Prefix:** `{prefix}`\n"
-         f"**{ZARROW} Total Commands:** `{len(set(self.context.bot.walk_commands()))}`\n"),         
+         f"**{ZARROW} Total Commands:** `{len(set(self.context.bot.walk_commands()))}`\n"),
         color=0xFF0000)
-    
+
     embed.add_field(
         name=f"{ZCLOUD} Main Features",
-        value=f">>> \n {ZSAFE} `»` Security\n" 
+        value=f">>> \n {ZSAFE} `»` Security\n"
               f" {ZBOT} `»` Automoderation\n"
-              f" {ZWRENCH} `»` Utility\n" 
+              f" {ZWRENCH} `»` Utility\n"
               f" {MUSIC} `»` Music\n"
               f" {WIFI} `»` Autoreact & responder\n"
               f" {SWORD} `»` Moderation\n"
               f" {ZPEOPLE} `»` Autorole & Invc\n"
               f" {ZROCKET} `»` Fun\n"
-              f" {GAMES} `»` Games\n" 
+              f" {GAMES} `»` Games\n"
               f" {ZBAN} `»` Ignore Channels\n"
               f" {WIFI} `»` Server\n"
               f" {ZUNMUTE} `»` Voice\n"
-              f" {SEED} `»` Welcomer\n"  
+              f" {SEED} `»` Welcomer\n"
               f" {ZTADA} `»` Giveaway\n"
               f" {TICKET} `»` Ticket {NEW}\n"
               f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
     )
-    
+
     embed.add_field(
         name=f" {ZMODULE} Extra Features",
         value=f">>> \n {CAST} `»` Advance Logging\n"
@@ -149,17 +142,17 @@ class HelpCommand(commands.HelpCommand):
               f" {LEVEL_UP} `»` Leveling {NEW}\n"
               f" {PIN} `»` Sticky {NEW}\n"
               f" {THUNDER} `»` Verification {NEW}\n"
-              f" {LOCK} `»` Encryption {NEW}\n" 
+              f" {LOCK} `»` Encryption {NEW}\n"
               f" {MINECRAFT} `»` Minecraft {NEW}\n"
               f" {MESSAGE} `»` Joindm {NEW}\n"
               f" {ZCIRCLE} `»` Birthday {NEW}\n"
-              f" {ZCIRCLE_ALT1} `»` Customrole\n"           
+              f" {ZCIRCLE_ALT1} `»` Customrole\n"
     )
 
     embed.set_footer(
-      text=f"Requested By {self.context.author} | [Support](https://discord.gg/codexdev)",
+      text=f"Requested By {self.context.author} | [Support]({serverLink})",
     )
-    
+
     view = vhelp.View(mapping=mapping, ctx=self.context, homeembed=embed, ui=2)
     await ctx.reply(view=view)
 
@@ -236,8 +229,8 @@ class HelpCommand(commands.HelpCommand):
       title=f"{group.qualified_name.title()} [{count}]",
       description="< > Duty | [ ] Optional\n",
       per_page=4
-    ).get_pages()   
-    
+    ).get_pages()
+
     paginator = Paginator(ctx, embeds)
     await paginator.paginate()
 
