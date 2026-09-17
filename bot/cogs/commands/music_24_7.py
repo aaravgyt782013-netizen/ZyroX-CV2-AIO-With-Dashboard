@@ -1,8 +1,4 @@
-"""LightCore music reliability layer.
-
-Adds resilient Lavalink handling, direct YouTube/YouTube Music URL support,
-and a fresh beta-labelled control panel whenever a new track starts.
-"""
+"""LightCore music reliability layer with a bot-wide beta notice."""
 
 import asyncio
 import json
@@ -35,14 +31,12 @@ def _patch_music_class():
                     configs = parsed
             except Exception:
                 configs = []
-
         if not configs:
             configs = [
                 {"host": "lavalinkv4.serenetia.com", "port": 443, "password": "https://seretia.link/discord", "secure": True},
                 {"host": "lava-v4.millohost.my.id", "port": 443, "password": "https://discord.gg/mjS5J2K3ep", "secure": True},
                 {"host": "lava-v4.ajieblogs.eu.org", "port": 80, "password": "https://dsc.gg/ajidevserver", "secure": False},
             ]
-
         nodes = []
         for index, item in enumerate(configs):
             try:
@@ -54,7 +48,6 @@ def _patch_music_class():
                 nodes.append(wavelink.Node(identifier=f"lightcore-{index + 1}", uri=uri, password=password, retries=None, resume_timeout=180, inactive_player_timeout=None))
             except Exception as exc:
                 print(f"[LightCore Music] Invalid Lavalink node config: {exc}")
-
         if not nodes:
             print("[LightCore Music] No Lavalink nodes configured.")
             return
@@ -93,8 +86,7 @@ def _patch_music_class():
             await player.play(payload.track)
             return
         if not player.queue.is_empty:
-            next_track = await player.queue.get_wait()
-            await player.play(next_track)
+            await player.play(await player.queue.get_wait())
             return
         if player.autoplay == wavelink.AutoPlayMode.enabled:
             await asyncio.sleep(2)
@@ -137,9 +129,10 @@ class Music247(commands.Cog):
             from .music import MusicControlView
             from discord.ui import TextDisplay
             view = MusicControlView(player, ctx, track, False)
-            # Keep the existing working control panel intact and add a clear
-            # beta-testing label to every newly posted Now Playing panel.
-            view.add_item(TextDisplay("🧪 **BETA TESTING** • LightCore Music"))
+            view.add_item(TextDisplay(
+                "🧪 **BOT IS IN BETA TESTING**\n"
+                "Found a bug? Please report it in the **LightCore support server**."
+            ))
             await ctx.send(view=view)
         except Exception as exc:
             print(f"[LightCore Music] Could not send track control panel: {exc}")
@@ -151,7 +144,6 @@ class Music247(commands.Cog):
         old = self.retry_tasks.get(guild_id)
         if old and not old.done():
             return
-
         async def worker():
             for delay in (2, 5, 10, 20):
                 await asyncio.sleep(delay)
@@ -163,7 +155,6 @@ class Music247(commands.Cog):
                     return
                 except Exception:
                     continue
-
         self.retry_tasks[guild_id] = asyncio.create_task(worker())
 
     @commands.Cog.listener()
