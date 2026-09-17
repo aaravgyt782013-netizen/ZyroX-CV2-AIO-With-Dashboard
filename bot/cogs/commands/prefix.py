@@ -4,15 +4,16 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.Tools import getConfig, updateConfig
-from .purge import Purge
+from utils.Tools import updateConfig
 
 
 class Prefix(commands.Cog):
-    """Per-server prefix management."""
+    """Per-server prefix management and prefix moderation commands."""
 
     def __init__(self, bot):
         self.bot = bot
+        # Remove the old purge alias from the Message cog so this command is authoritative.
+        bot.remove_command("purge")
 
     prefix = app_commands.Group(
         name="prefix",
@@ -54,7 +55,52 @@ class Prefix(commands.Cog):
         else:
             await interaction.response.send_message(message, ephemeral=True)
 
+    @commands.command(name="purge", aliases=["clear"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @commands.bot_has_permissions(manage_messages=True)
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def purge(self, ctx: commands.Context, amount: int):
+        """Delete recent messages using the server's configured prefix."""
+        if amount < 1:
+            await ctx.send("❌ Amount must be at least **1**.", delete_after=5)
+            return
+        if amount > 2000:
+            await ctx.send("❌ You can purge a maximum of **2000 messages** at once.", delete_after=5)
+            return
+
+        try:
+            # Include the user's `.purge 10` command message when possible.
+            deleted = await ctx.channel.purge(limit=amount + 1)
+        except discord.Forbidden:
+            await ctx.send("❌ I need the **Manage Messages** permission to purge messages.")
+            return
+        except discord.HTTPException:
+            await ctx.send("❌ Discord rejected the purge request. Try a smaller amount.")
+            return
+
+        # The command message is included in the deletion count.
+        count = max(0, len(deleted) - 1)
+        await ctx.send(
+            f"✅ Successfully purged **{count}** message{'s' if count != 1 else ''}.",
+            delete_after=5,
+        )
+
+    @purge.error
+    async def purge_error(self, ctx: commands.Context, error: commands.CommandError):
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You need the **Manage Messages** permission to use purge.", delete_after=5)
+        elif isinstance(error, commands.BotMissingPermissions):
+            await ctx.send("❌ I need the **Manage Messages** permission to use purge.", delete_after=5)
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"❌ Usage: `{ctx.prefix}purge <amount>`", delete_after=5)
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send(f"❌ Amount must be a number. Usage: `{ctx.prefix}purge <amount>`", delete_after=5)
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(f"⏳ Try again in **{error.retry_after:.1f}s**.", delete_after=5)
+        else:
+            await ctx.send("❌ I couldn't run the purge command. Please try again.", delete_after=5)
+
 
 async def setup(bot):
     await bot.add_cog(Prefix(bot))
-    await bot.add_cog(Purge(bot))
