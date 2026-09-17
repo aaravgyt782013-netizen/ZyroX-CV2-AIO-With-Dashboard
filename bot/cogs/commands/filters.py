@@ -12,16 +12,74 @@
 # ║                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
+import asyncio
 import discord
 from discord.ext import commands
 from typing import Union
 import wavelink
 from utils.Tools import *
 
+
 class FilterCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.active_filters = {}
+        self._stalled = {}
+        self._retrying = set()
+        self._audio_monitor = bot.loop.create_task(self._monitor_audio())
+
+    def cog_unload(self):
+        if not self._audio_monitor.done():
+            self._audio_monitor.cancel()
+
+    async def _monitor_audio(self):
+        """Keep the Lavalink player gain stable and recover from a stalled stream."""
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            await asyncio.sleep(10)
+            for player in list(self.bot.voice_clients):
+                try:
+                    if not isinstance(player, wavelink.Player):
+                        continue
+                    if not player.is_connected() or not player.current:
+                        self._stalled.pop(player.guild.id, None)
+                        continue
+                    if not player.playing or player.paused:
+                        self._stalled.pop(player.guild.id, None)
+                        continue
+
+                    # Keep the player's gain fixed. Track-to-track loudness can still
+                    # differ because the original recordings have different mastering.
+                    if getattr(player, "volume", 100) != 100:
+                        await player.set_volume(100)
+
+                    guild_id = player.guild.id
+                    track_id = getattr(player.current, "identifier", None) or player.current.title
+                    position = int(player.position)
+                    previous = self._stalled.get(guild_id)
+
+                    if previous and previous[0] == track_id and abs(position - previous[1]) < 250:
+                        stalled_for = previous[2] + 1
+                    else:
+                        stalled_for = 0
+
+                    self._stalled[guild_id] = (track_id, position, stalled_for)
+
+                    # About 20 seconds without progress while unpaused usually means
+                    # Lavalink/source playback has stalled. Re-seek from the current
+                    # position once instead of leaving the bot silently connected.
+                    if stalled_for >= 2 and guild_id not in self._retrying:
+                        self._retrying.add(guild_id)
+                        try:
+                            resume_at = max(0, position)
+                            track = player.current
+                            await player.play(track, start=resume_at, replace=True, volume=100)
+                            self._stalled[guild_id] = (track_id, resume_at, 0)
+                        finally:
+                            self._retrying.discard(guild_id)
+                except Exception:
+                    # Never let the stability monitor interfere with normal playback.
+                    continue
 
     async def apply_filter(self, ctx: commands.Context, filter_name: str):
         player: Union[wavelink.Player, None] = ctx.voice_client
@@ -89,7 +147,6 @@ class FilterCog(commands.Cog):
             return
 
         filter_options = [
-
             discord.SelectOption(label="Vaporwave", description="Apply vaporwave effect"),
             discord.SelectOption(label="Nightcore", description="Apply nightcore effect"),
             discord.SelectOption(label="Vibrato", description="Apply vibrato effect"),
@@ -107,17 +164,17 @@ class FilterCog(commands.Cog):
                 await interaction.response.defer()
                 selected_filter = select.values[0].lower()
                 await self.cog.apply_filter(ctx, selected_filter)
-                #await interaction.message.delete()  
-                self.disable_all()  
+                self.disable_all()
 
             @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
             async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-                await interaction.message.delete()  
-                self.disable_all()  
+                await interaction.message.delete()
+                self.disable_all()
+
             def disable_all(self):
                 for child in self.children:
                     child.disabled = True
-                self.stop()  
+                self.stop()
 
         view = FilterSelect()
         view.cog = self
@@ -145,4 +202,3 @@ class FilterCog(commands.Cog):
         await player.set_filters(filters)
         self.active_filters.pop(ctx.guild.id, None)
         await ctx.send(embed=discord.Embed(description="Filter disabled.", color=discord.Color.red()))
-
