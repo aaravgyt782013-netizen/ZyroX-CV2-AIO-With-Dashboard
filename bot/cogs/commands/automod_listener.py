@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import os
 import time
 from collections import defaultdict, deque
 from datetime import timedelta
@@ -10,6 +11,7 @@ import discord
 from discord.ext import commands
 
 DATABASE_PATH = "db/automod.db"
+os.makedirs("db", exist_ok=True)
 
 URL_RE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
 INVITE_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com/invite)/[A-Za-z0-9-]+", re.IGNORECASE)
