@@ -528,9 +528,23 @@ class Music(commands.Cog):
         
             return"""
             
-        tracks = await wavelink.Playable.search(query)
+        # Prefer normal YouTube search. Wavelink defaults plain text to
+        # YouTube Music (ytmsearch), and some public Lavalink nodes currently
+        # return 502 for that endpoint.
+        tracks = None
+        last_search_error = None
+        for source in (wavelink.enums.TrackSource.YouTube, wavelink.enums.TrackSource.YouTubeMusic):
+            try:
+                tracks = await wavelink.Playable.search(query, source=source)
+                if tracks:
+                    break
+            except Exception as exc:
+                last_search_error = exc
+                continue
+
         if not tracks:
-            await ctx.send(view=CV2("No results found."))
+            detail = f" ({type(last_search_error).__name__})" if last_search_error else ""
+            await ctx.send(view=CV2(f"{WARNING} No playable results were found{detail}. Please try another search or URL."))
             return
 
         if isinstance(tracks, wavelink.Playlist):
