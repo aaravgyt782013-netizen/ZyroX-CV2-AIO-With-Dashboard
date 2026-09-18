@@ -374,23 +374,23 @@ class Music(commands.Cog):
                 break
         if player and not player.playing and len(player.channel.members) == 1:
             await player.disconnect(force=True)
-                try:
-                    support = Button(label='Support', style=discord.ButtonStyle.link, url='https://discord.gg/codexdev')
-                    vote = Button(label='Vote', style=discord.ButtonStyle.link, url='https://top.gg/bot//vote')
-                    view = LayoutView(timeout=None)
-                    container = build_container(
-                        TextDisplay("**Inactive Timeout**"),
-                        Separator(visible=True),
-                        TextDisplay("Bot has been disconnected due to inactivity (being idle in Voice Channel) for more than 2 minutes."),
-                        Separator(visible=True),
-                        ActionRow(support, vote),
-                        Separator(visible=True),
-                        TextDisplay(f"*Thanks for choosing {BRAND_NAME}!*"),
-                    )
-                    view.add_item(container)
-                    await player.ctx.channel.send(view=view)
-                except:
-                    pass
+            try:
+                support = Button(label='Support', style=discord.ButtonStyle.link, url='https://discord.gg/codexdev')
+                vote = Button(label='Vote', style=discord.ButtonStyle.link, url='https://top.gg/bot//vote')
+                view = LayoutView(timeout=None)
+                container = build_container(
+                    TextDisplay("**Inactive Timeout**"),
+                    Separator(visible=True),
+                    TextDisplay("Bot has been disconnected due to inactivity (being idle in Voice Channel) for more than 2 minutes."),
+                    Separator(visible=True),
+                    ActionRow(support, vote),
+                    Separator(visible=True),
+                    TextDisplay(f"*Thanks for choosing {BRAND_NAME}!*"),
+                )
+                view.add_item(container)
+                await player.ctx.channel.send(view=view)
+            except Exception:
+                pass
 
     async def connect_nodes(self) -> None:
         primary_host = os.getenv("LAVALINK_HOST", "").strip()
