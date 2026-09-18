@@ -395,19 +395,44 @@ class TicketCog(commands.Cog, name="Ticket System"):
         if (count := self.db.fetchone("SELECT ticket_count FROM user_ticket_counts WHERE guild_id=? AND user_id=?",(guild.id,user.id))) and count['ticket_count'] >= TICKET_LIMIT_PER_USER: return await inter.followup.send(f"You have reached the max of {TICKET_LIMIT_PER_USER} open tickets.",ephemeral=True)
         
         cat_info = self.db.fetchone("SELECT * FROM ticket_categories WHERE category_id=?", (cat_id,))
-        disc_cat = guild.get_channel(cat_info['discord_category_id'])
-        if not cat_info or not disc_cat: return await inter.followup.send("This ticket category has been deleted or is misconfigured.", ephemeral=True)
-        
+        if not cat_info:
+            return await inter.followup.send("This ticket category has been deleted or is misconfigured.", ephemeral=True)
+
+        disc_cat = guild.get_channel(cat_info["discord_category_id"])
+        if not isinstance(disc_cat, discord.CategoryChannel):
+            return await inter.followup.send("This ticket category is missing its Discord ticket-open category.", ephemeral=True)
+
+        # If the selected panel row has no staff roles (for example an older
+        # panel), inherit the newest staff-role configuration for this
+        # Discord ticket category.
+        staff_roles = []
+        if cat_info["notified_roles"]:
+            staff_roles = [x for x in str(cat_info["notified_roles"]).split(",") if x.isdigit()]
+        if not staff_roles:
+            live = self.db.fetchone(
+                "SELECT notified_roles FROM ticket_categories "
+                "WHERE guild_id=? AND discord_category_id=? "
+                "AND notified_roles IS NOT NULL AND notified_roles != '' "
+                "ORDER BY category_id DESC LIMIT 1",
+                (guild.id, disc_cat.id)
+            )
+            if live and live["notified_roles"]:
+                staff_roles = [x for x in str(live["notified_roles"]).split(",") if x.isdigit()]
+
         t_num = (self.db.fetchone("SELECT MAX(ticket_number) as n FROM open_tickets WHERE guild_id=?", (guild.id,))['n'] or 0) + 1
         
         overwrites = {guild.default_role:discord.PermissionOverwrite(view_channel=False), user:discord.PermissionOverwrite(view_channel=True), guild.me:discord.PermissionOverwrite(view_channel=True, manage_channels=True)}
         
         pings = [user.mention]
-        if cat_info['notified_roles']:
-            for role_id in cat_info['notified_roles'].split(','):
-                if role := guild.get_role(int(role_id)):
-                    overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-                    pings.append(role.mention)
+        for role_id in staff_roles:
+            role = guild.get_role(int(role_id))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True
+                )
+                pings.append(role.mention)
         
         try: ch = await disc_cat.create_text_channel(name=f"ticket-{t_num:04d}-{user.name.lower()}", overwrites=overwrites)
         except: return await inter.followup.send("I lack permissions to create a channel.", ephemeral=True)
@@ -516,6 +541,21 @@ class TicketActionsView(discord.ui.View):
             for value in str(cat_info["notified_roles"]).split(","):
                 try: allowed_role_ids.add(int(value))
                 except (TypeError, ValueError): pass
+
+        # Also resolve the newest configuration for the Discord category.
+        # This repairs tickets/panels created before the staff-role setup fix.
+        if interaction.channel and interaction.channel.category_id:
+            live = self.cog.db.fetchone(
+                "SELECT notified_roles FROM ticket_categories "
+                "WHERE guild_id=? AND discord_category_id=? "
+                "AND notified_roles IS NOT NULL AND notified_roles != '' "
+                "ORDER BY category_id DESC LIMIT 1",
+                (interaction.guild.id, interaction.channel.category_id)
+            )
+            if live and live["notified_roles"]:
+                for value in str(live["notified_roles"]).split(","):
+                    try: allowed_role_ids.add(int(value))
+                    except (TypeError, ValueError): pass
 
         # Recover roles for tickets created before staff-role configuration was fixed.
         if not allowed_role_ids and interaction.channel:
