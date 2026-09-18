@@ -52,9 +52,23 @@ class Autorole2(Cog):
         else:
             roles_to_add = human_roles
 
+        if not roles_to_add:
+            return
+
+        me = member.guild.me
+        if me is None or not me.guild_permissions.manage_roles:
+            logger.warning("Autorole skipped in %s: bot is missing Manage Roles.", member.guild.id)
+            return
+
         for role_id in roles_to_add:
             role = member.guild.get_role(role_id)
             if role:
+                if role.is_default() or role.managed or role >= me.top_role:
+                    logger.warning(
+                        "Autorole skipped role %s (%s) in guild %s: role is not assignable by the bot.",
+                        role.name, role.id, member.guild.id
+                    )
+                    continue
                 try:
                     await member.add_roles(role, reason=f"{BRAND_NAME} | Autoroles")
                 except discord.Forbidden:
