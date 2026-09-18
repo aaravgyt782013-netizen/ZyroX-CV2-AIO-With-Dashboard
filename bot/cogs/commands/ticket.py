@@ -361,6 +361,40 @@ class CategoryChannelConfigView(discord.ui.View):
         await self.parent.message.edit(embed=self.parent._update_embed(), view=self.parent)
 
 
+async def _ticket_staff_authorized(cog, guild, member, category_id=None, channel=None):
+    """Return True for owners, configured ticket staff, or channel managers."""
+    if member.id in OWNER_IDS:
+        return True
+
+    allowed_role_ids = set()
+    if category_id:
+        row = cog.db.fetchone("SELECT notified_roles FROM ticket_categories WHERE category_id=?", (category_id,))
+        if row and row["notified_roles"]:
+            for value in str(row["notified_roles"]).split(","):
+                try:
+                    allowed_role_ids.add(int(value))
+                except (TypeError, ValueError):
+                    pass
+
+    if channel and channel.category_id:
+        row = cog.db.fetchone(
+            "SELECT notified_roles FROM ticket_categories "
+            "WHERE guild_id=? AND discord_category_id=? "
+            "AND notified_roles IS NOT NULL AND notified_roles != '' "
+            "ORDER BY category_id DESC LIMIT 1",
+            (guild.id, channel.category_id)
+        )
+        if row and row["notified_roles"]:
+            for value in str(row["notified_roles"]).split(","):
+                try:
+                    allowed_role_ids.add(int(value))
+                except (TypeError, ValueError):
+                    pass
+
+    member_role_ids = {role.id for role in member.roles}
+    perms = getattr(member, "guild_permissions", None)
+    return bool(member_role_ids.intersection(allowed_role_ids) or (perms and (perms.manage_channels or perms.manage_guild)))
+
 class TicketCog(commands.Cog, name="Ticket System"):
     def __init__(self, bot):
         self.bot, self.db = bot, TicketDatabase(DB_PATH)
@@ -455,6 +489,59 @@ class TicketCog(commands.Cog, name="Ticket System"):
     @commands.guild_only()
     async def ticket(self, ctx):
         if ctx.invoked_subcommand is None: await ctx.send_help(ctx.command)
+
+    async def _dispatch_action(self, ctx, action):
+        """Handle prefix/hybrid ticket actions."""
+        ticket = self.db.fetchone("SELECT * FROM open_tickets WHERE channel_id=?", (ctx.channel.id,))
+        if not ticket:
+            return await ctx.send("This command must be used inside an open ticket.", ephemeral=True)
+        if not await _ticket_staff_authorized(self, ctx.guild, ctx.author, ticket["category_db_id"], ctx.channel):
+            return await ctx.send("You do not have the configured staff role for this ticket.", ephemeral=True)
+
+        if action == "close":
+            creator = ctx.guild.get_member(ticket["creator_id"])
+            if creator:
+                self.db.execute("UPDATE user_ticket_counts SET ticket_count=MAX(0,ticket_count-1) WHERE guild_id=? AND user_id=?", (ctx.guild.id, creator.id))
+                await ctx.channel.set_permissions(creator, send_messages=False, view_channel=False)
+            category_info = self.db.fetchone("SELECT name, log_channel_id FROM ticket_categories WHERE category_id=?", (ticket["category_db_id"],))
+            category_name = category_info["name"] if category_info else "Unknown"
+            closed_category = await get_or_create_closed_category(self.db, ctx.guild)
+            if closed_category:
+                await ctx.channel.edit(category=closed_category)
+            self.db.execute("UPDATE open_tickets SET closed_by_id=?, closed_at=? WHERE channel_id=?", (ctx.author.id, datetime.now().isoformat(), ctx.channel.id))
+            await log_ticket_action(self.db, ctx.guild, ctx.author, "Closed", f"Ticket {ctx.channel.mention} (Category: {category_name})", category_info["log_channel_id"] if category_info else None)
+            closed_embed = discord.Embed(title="Ticket Closed", description=f"This ticket has been officially closed and archived by {ctx.author.mention}.\\nThe user has been removed from the channel.\\n\\nStaff can use the buttons below to reopen, create a transcript, or permanently delete the channel.", color=EMBED_COLOR, timestamp=datetime.now())
+            closed_embed.add_field(name="Ticket Creator", value=f"<@{ticket['creator_id']}>", inline=True)
+            closed_embed.add_field(name="Closed By", value=ctx.author.mention, inline=True)
+            closed_embed.add_field(name="Original Category", value=category_name, inline=True)
+            await ctx.channel.send(embed=closed_embed, view=ClosedTicketActionsView(self, ctx.channel.id, ticket["category_db_id"]))
+            return await ctx.send("Ticket successfully closed and archived.")
+
+        if action == "lock":
+            if ticket["is_locked"]:
+                return await ctx.send("This ticket is already locked.", ephemeral=True)
+            creator = ctx.guild.get_member(ticket["creator_id"])
+            if creator:
+                await ctx.channel.set_permissions(creator, send_messages=False)
+            self.db.execute("UPDATE open_tickets SET is_locked=1 WHERE channel_id=?", (ctx.channel.id,))
+            return await ctx.send(f"{LOCK_EMOJI} Ticket locked by {ctx.author.mention}.")
+
+        if action == "unlock":
+            if not ticket["is_locked"]:
+                return await ctx.send("This ticket is already unlocked.", ephemeral=True)
+            creator = ctx.guild.get_member(ticket["creator_id"])
+            if creator:
+                await ctx.channel.set_permissions(creator, send_messages=True)
+            self.db.execute("UPDATE open_tickets SET is_locked=0 WHERE channel_id=?", (ctx.channel.id,))
+            return await ctx.send(f"{UNLOCK_EMOJI} Ticket unlocked by {ctx.author.mention}.")
+
+        if action == "claim":
+            if ticket["is_claimed"]:
+                return await ctx.send(f"This ticket is already claimed by <@{ticket['claimed_by_id']}>.", ephemeral=True)
+            self.db.execute("UPDATE open_tickets SET is_claimed=1, claimed_by_id=? WHERE channel_id=?", (ctx.author.id, ctx.channel.id))
+            return await ctx.send(f"{CLAIM_EMOJI} Ticket claimed by {ctx.author.mention}. They will now handle this request.")
+
+        return await ctx.send("Unknown ticket action.", ephemeral=True)
 
     @ticket.command(name="setup", description="Start the interactive setup for the ticket panel.")
     @commands.has_permissions(manage_guild=True)
