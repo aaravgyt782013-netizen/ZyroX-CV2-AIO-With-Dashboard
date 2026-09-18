@@ -500,9 +500,9 @@ class Customrole(commands.Cog):
 
     
 
-    @commands.hybrid_command(name="staff",
+    @commands.hybrid_command(name="customstaff",
          description="Gives the staff role to the user.",
-         aliases=['official'],
+         aliases=["customstaff", "official"],
          help="Gives the staff role to the user.")
     @blacklist_check()
     @ignore_check()
