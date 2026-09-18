@@ -11,6 +11,7 @@ from .commands.general import General
 from .commands.music import Music
 from .commands.music_24_7 import Music247
 from .commands.prefix import Prefix
+from .commands.purge import Purge
 from .commands.automod import Automod
 from .commands.welcome import Welcomer
 from .commands.fun import Fun
@@ -169,6 +170,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(Music(bot))
     await bot.add_cog(Music247(bot))
     await bot.add_cog(Prefix(bot))
+    await bot.add_cog(Purge(bot))
     await bot.add_cog(Automod(bot))
     await bot.add_cog(Welcomer(bot))
     await bot.add_cog(Fun(bot))
