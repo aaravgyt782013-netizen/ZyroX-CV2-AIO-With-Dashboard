@@ -76,6 +76,22 @@ class TicketDatabase:
         if self.conn: self.conn.close()
 
 # --- Utility Functions ---
+def parse_staff_role_ids(guild, role_input):
+    """Resolve role mentions, raw IDs, and exact role names into role IDs."""
+    if not role_input or role_input.strip().lower() == "none":
+        return []
+    found = [int(x) for x in re.findall(r"<@&(\d+)>", role_input)]
+    for token in role_input.split():
+        if token.isdigit():
+            found.append(int(token))
+    remaining = re.sub(r"<@&\d+>", "", role_input).strip()
+    if remaining:
+        role = discord.utils.find(lambda r: r.name.lower() == remaining.lower(), guild.roles)
+        if role:
+            found.append(role.id)
+    return [rid for rid in dict.fromkeys(found) if guild.get_role(rid) and not guild.get_role(rid).is_default()]
+
+
 async def get_or_create_log_channel(db, guild):
     config = db.fetchone("SELECT logging_channel_id FROM guild_configs WHERE guild_id = ?", (guild.id,))
     if config and config["logging_channel_id"] and (ch := guild.get_channel(config["logging_channel_id"])): return ch
@@ -223,10 +239,12 @@ class CategoryConfigView(discord.ui.View):
         role_input = await self._prompt(inter, "Please mention one or more staff roles to ping, separated by spaces, or type `none`.", followup=True)
         if not role_input: return await inter.followup.send("Timed out.", ephemeral=True)
 
-        role_ids = []
-        if role_input.lower() != "none":
-            for role_id_str in re.findall(r"<@&(\\d+)>", role_input):
-                role_ids.append(int(role_id_str))
+        role_ids = parse_staff_role_ids(self.ctx.guild, role_input)
+        if role_input.lower() != "none" and not role_ids:
+            return await inter.followup.send(
+                "I couldn't find a valid Discord role in that input. Please mention the staff role (for example, @Support).",
+                ephemeral=True
+            )
 
         self.categories.append({
             "name": cat_name, "emoji": emoji,
