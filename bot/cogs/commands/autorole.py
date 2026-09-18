@@ -13,6 +13,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from __future__ import annotations
+import os
 import discord
 from utils.emoji import CROSS, ICONS_WARNING, TICK
 import aiosqlite
@@ -33,6 +34,7 @@ logging.basicConfig(
 )
 
 DATABASE_PATH = 'db/autorole.db'
+os.makedirs('db', exist_ok=True)
 
 class BasicView(discord.ui.View):
     def __init__(self, ctx: commands.Context, timeout=60):
@@ -240,6 +242,7 @@ class AutoRole(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
+    @commands.bot_has_permissions(manage_roles=True)
     async def _autorole_humans_add(self, ctx, *, role: discord.Role):
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT humans FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
@@ -279,7 +282,7 @@ class AutoRole(commands.Cog):
                 data = await cursor.fetchone()
 
         if data:
-            humans = eval(data[0])
+            humans = self._parse_role_ids(data[0])
             if role.id not in humans:
                 view = CV2(f"{CROSS} Error", f"{role.mention} is not in human autoroles.")
             else:
@@ -311,6 +314,7 @@ class AutoRole(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
+    @commands.bot_has_permissions(manage_roles=True)
     async def _autorole_bots_add(self, ctx, *, role: discord.Role):
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT bots FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
@@ -350,7 +354,7 @@ class AutoRole(commands.Cog):
                 data = await cursor.fetchone()
 
         if data:
-            bots = eval(data[0])
+            bots = self._parse_role_ids(data[0])
             if role.id not in bots:
                 view = CV2(f"{CROSS} Error", f"{role.mention} is not in bot autoroles.")
             else:
