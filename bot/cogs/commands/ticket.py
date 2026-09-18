@@ -406,7 +406,7 @@ class TicketCog(commands.Cog, name="Ticket System"):
         if cat_info['notified_roles']:
             for role_id in cat_info['notified_roles'].split(','):
                 if role := guild.get_role(int(role_id)):
-                    overwrites[role] = discord.PermissionOverwrite(view_channel=True)
+                    overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
                     pings.append(role.mention)
         
         try: ch = await disc_cat.create_text_channel(name=f"ticket-{t_num:04d}-{user.name.lower()}", overwrites=overwrites)
@@ -490,22 +490,6 @@ class TicketCog(commands.Cog, name="Ticket System"):
     @commands.has_permissions(manage_channels=True)
     async def claim(self, ctx): await self._dispatch_action(ctx, "claim")
 
-    @ticket.command(name="staff", description="Set the staff role for the current ticket category.")
-    @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(role="The staff role that should be pinged and allowed to manage tickets.")
-    async def staff(self, ctx, role: discord.Role):
-        ticket = self.db.fetchone("SELECT category_db_id FROM open_tickets WHERE channel_id=?", (ctx.channel.id,))
-        if not ticket or not ticket["category_db_id"]:
-            return await ctx.send("This command must be used inside an active ticket.", ephemeral=True)
-        self.db.execute(
-            "UPDATE ticket_categories SET notified_roles=? WHERE category_id=?",
-            (str(role.id), ticket["category_db_id"])
-        )
-        await ctx.send(
-            f"✅ Staff role updated to {role.mention}. This role will be pinged on new tickets of this type and can use the ticket controls.",
-            ephemeral=True
-        )
-
     @ticket.command(name="transcript", description="Generate a transcript of a closed ticket.")
     @commands.has_permissions(manage_channels=True)
     async def transcript(self, ctx):
@@ -526,40 +510,27 @@ class TicketActionsView(discord.ui.View):
         self.cog, self.ch_id, self.cat_id = cog, ch_id, cat_id
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        # Resolve the staff roles from the saved ticket category. Older tickets
-        # can point at a category DB row that was replaced during a later setup,
-        # so fall back to the Discord category containing this ticket.
-        cat_info = self.cog.db.fetchone(
-            "SELECT notified_roles FROM ticket_categories WHERE category_id=?",
-            (self.cat_id,)
-        )
-        if not cat_info and interaction.channel and interaction.channel.category_id:
-            cat_info = self.cog.db.fetchone(
-                "SELECT notified_roles FROM ticket_categories WHERE guild_id=? AND discord_category_id=?",
-                (interaction.guild.id, interaction.channel.category_id)
-            )
-
+        cat_info = self.cog.db.fetchone("SELECT notified_roles FROM ticket_categories WHERE category_id=?", (self.cat_id,))
         allowed_role_ids = set()
         if cat_info and cat_info["notified_roles"]:
-            for value in cat_info["notified_roles"].split(","):
-                try:
-                    allowed_role_ids.add(int(value))
-                except (TypeError, ValueError):
-                    continue
+            for value in str(cat_info["notified_roles"]).split(","):
+                try: allowed_role_ids.add(int(value))
+                except (TypeError, ValueError): pass
+
+        # Recover roles for tickets created before staff-role configuration was fixed.
+        if not allowed_role_ids and interaction.channel:
+            for target, overwrite in interaction.channel.overwrites.items():
+                if isinstance(target, discord.Role) and not target.is_default():
+                    if overwrite.view_channel is True and overwrite.send_messages is True:
+                        allowed_role_ids.add(target.id)
 
         user_role_ids = {role.id for role in interaction.user.roles}
         perms = getattr(interaction.user, "guild_permissions", None)
-        is_manager = bool(perms and (perms.manage_channels or perms.manage_guild))
-
-        if is_manager or user_role_ids.intersection(allowed_role_ids):
+        if user_role_ids.intersection(allowed_role_ids) or (perms and (perms.manage_channels or perms.manage_guild)):
+            if allowed_role_ids and (not cat_info or not cat_info["notified_roles"]):
+                self.cog.db.execute("UPDATE ticket_categories SET notified_roles=? WHERE category_id=?", (",".join(map(str, sorted(allowed_role_ids))), self.cat_id))
             return True
-
-        if not cat_info:
-            message = "This ticket is not linked to a ticket category configuration."
-        else:
-            message = "You do not have the configured staff role for this ticket."
-
-        await interaction.response.send_message(message, ephemeral=True)
+        await interaction.response.send_message("You do not have the configured staff role for this ticket.", ephemeral=True)
         return False
 
     @discord.ui.button(label="Lock", emoji=LOCK_EMOJI, custom_id="t_lock", style=discord.ButtonStyle.secondary)
