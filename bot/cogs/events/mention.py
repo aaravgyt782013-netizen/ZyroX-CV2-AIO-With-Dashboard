@@ -68,17 +68,7 @@ class Mention(commands.Cog):
         self.bot = bot
         self.color = 0xFF0000
         self.bot_name = BotName
-        try:
-            from ..commands.tempvoice import TempVoice
-            if bot.get_cog("TempVoice") is None:
-                bot.loop.create_task(bot.add_cog(TempVoice(bot)))
-
-            # Install the reliable Join-to-Create event handler after TempVoice
-            # is registered. It removes the older event listener to prevent
-            # duplicate temporary channels.
-            from ..commands.tempvoice_event_fix import TempVoiceEventFix
-            if bot.get_cog("TempVoiceEventFix") is None:
-                bot.loop.create_task(bot.add_cog(TempVoiceEventFix(bot)))
+        # TempVoice and its Join-to-Create listener are loaded centrally by bot/cogs/__init__.py.
         except Exception as exc:
             print(f"TempVoice registration error: {exc}")
 
