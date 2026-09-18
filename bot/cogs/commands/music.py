@@ -477,14 +477,46 @@ class Music(commands.Cog):
             await ctx.send(view=CV2(f"{WARNING} you need to be in a voice channel to use this command."))
             return
 
-        vc = ctx.voice_client or await ctx.author.voice.channel.connect(cls=wavelink.Player)
-        vc.ctx = ctx
-        
-        
-        if vc.playing:
-            if ctx.voice_client and ctx.voice_client.channel != ctx.author.voice.channel:
-                await ctx.send(view=CV2(f"You must be connected to {ctx.voice_client.channel.mention} to play."))
+        target_channel = ctx.author.voice.channel
+        vc = ctx.voice_client
+
+        # Reuse an existing player only when it is already in the user's VC.
+        # A stale player in another VC can otherwise cause Wavelink/Discord to
+        # wait for a voice-state update until ChannelTimeoutException fires.
+        if vc and vc.channel and vc.channel.id != target_channel.id:
+            if vc.playing:
+                await ctx.send(view=CV2(f"You must be connected to {vc.channel.mention} to play."))
                 return
+            try:
+                await vc.disconnect(force=True)
+            except Exception:
+                pass
+            vc = None
+
+        if vc is None:
+            for attempt in range(3):
+                try:
+                    vc = await target_channel.connect(cls=wavelink.Player, reconnect=True)
+                    break
+                except Exception as exc:
+                    print(f"[LightCore Music] Voice connect attempt {attempt + 1}/3 failed: {type(exc).__name__}: {exc}")
+                    try:
+                        stale = ctx.voice_client
+                        if stale:
+                            await stale.disconnect(force=True)
+                    except Exception:
+                        pass
+                    if attempt < 2:
+                        await asyncio.sleep(2)
+
+            if vc is None:
+                await ctx.send(view=CV2(
+                    f"{WARNING} I couldn't connect to {target_channel.mention} after 3 attempts. "
+                    "Please try .play again in a few seconds."
+                ))
+                return
+
+        vc.ctx = ctx
         vc.autoplay = wavelink.AutoPlayMode.disabled
 
         """if re.match(SPOTIFY_TRACK_REGEX, query):
