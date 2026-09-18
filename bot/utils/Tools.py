@@ -1,4 +1,7 @@
 import json, sys, os
+
+# Ensure runtime SQLite directory exists on fresh deployments.
+os.makedirs('db', exist_ok=True)
 import discord
 from discord.ext import commands
 from core import Context
