@@ -408,6 +408,8 @@ class Music(commands.Cog):
         configs.extend([
             ("lavalinkv4.serenetia.com", "443", "https://seretia.link/discord", True, "serenetia"),
             ("lava-v4.millohost.my.id", "443", "https://discord.gg/mjS5J2K3ep", True, "millohost"),
+            ("lavalink.jirayu.net", "443", "youshallnotpass", True, "jirayu"),
+            ("lavalink-v4.triniumhost.com", "443", "free", True, "trinium"),
         ])
 
         nodes = []
@@ -434,7 +436,11 @@ class Music(commands.Cog):
 
         if not nodes:
             raise RuntimeError("No Lavalink nodes are configured.")
-        await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
+        try:
+            await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
+            print(f"[LightCore Music] Connected to Lavalink pool with {len(nodes)} configured node(s).")
+        except Exception as exc:
+            print(f"[LightCore Music] Lavalink connection failed: {type(exc).__name__}: {exc}")
 
     async def display_player_embed(self, player, track, ctx, autoplay=False):
         await ctx.send(view=MusicControlView(player, ctx, track, autoplay))
@@ -543,7 +549,7 @@ class Music(commands.Cog):
                 continue
 
         if not tracks:
-            detail = f" ({type(last_search_error).__name__})" if last_search_error else ""
+            detail = f" ({type(last_search_error).__name__}: {last_search_error})" if last_search_error else ""
             await ctx.send(view=CV2(f"{WARNING} No playable results were found{detail}. Please try another search or URL."))
             return
 
