@@ -449,6 +449,22 @@ class TicketCog(commands.Cog, name="Ticket System"):
     @commands.has_permissions(manage_channels=True)
     async def claim(self, ctx): await self._dispatch_action(ctx, "claim")
 
+    @ticket.command(name="staff", description="Set the staff role for the current ticket category.")
+    @commands.has_permissions(manage_guild=True)
+    @app_commands.describe(role="The staff role that should be pinged and allowed to manage tickets.")
+    async def staff(self, ctx, role: discord.Role):
+        ticket = self.db.fetchone("SELECT category_db_id FROM open_tickets WHERE channel_id=?", (ctx.channel.id,))
+        if not ticket or not ticket["category_db_id"]:
+            return await ctx.send("This command must be used inside an active ticket.", ephemeral=True)
+        self.db.execute(
+            "UPDATE ticket_categories SET notified_roles=? WHERE category_id=?",
+            (str(role.id), ticket["category_db_id"])
+        )
+        await ctx.send(
+            f"✅ Staff role updated to {role.mention}. This role will be pinged on new tickets of this type and can use the ticket controls.",
+            ephemeral=True
+        )
+
     @ticket.command(name="transcript", description="Generate a transcript of a closed ticket.")
     @commands.has_permissions(manage_channels=True)
     async def transcript(self, ctx):
@@ -571,14 +587,30 @@ class ClosedTicketActionsView(discord.ui.View):
         self.cog, self.ch_id, self.cat_id = cog, ch_id, cat_id
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        cat_info = self.cog.db.fetchone("SELECT notified_roles FROM ticket_categories WHERE category_id=?", (self.cat_id,))
-        if not cat_info or not cat_info['notified_roles']: return False
-        allowed_role_ids = {int(r_id) for r_id in cat_info['notified_roles'].split(',')}
+        cat_info = self.cog.db.fetchone(
+            "SELECT notified_roles FROM ticket_categories WHERE category_id=?",
+            (self.cat_id,)
+        )
+        allowed_role_ids = set()
+        if cat_info and cat_info["notified_roles"]:
+            for value in cat_info["notified_roles"].split(","):
+                try:
+                    allowed_role_ids.add(int(value))
+                except (TypeError, ValueError):
+                    pass
+
         user_role_ids = {role.id for role in interaction.user.roles}
-        if not user_role_ids.intersection(allowed_role_ids):
-            await interaction.response.send_message("You do not have the required role for this action.", ephemeral=True)
-            return False
-        return True
+        perms = getattr(interaction.user, "guild_permissions", None)
+        if user_role_ids.intersection(allowed_role_ids) or (
+            perms and (perms.manage_channels or perms.manage_guild)
+        ):
+            return True
+
+        await interaction.response.send_message(
+            "You do not have the configured staff role for this ticket.",
+            ephemeral=True
+        )
+        return False
 
     @discord.ui.button(label="Reopen", emoji=REOPEN_EMOJI, style=discord.ButtonStyle.success)
     async def b_reopen(self, i: discord.Interaction, button: discord.ui.Button):
