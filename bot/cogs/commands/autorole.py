@@ -63,6 +63,20 @@ class AutoRole(commands.Cog):
             """)
             await db.commit()
 
+    @staticmethod
+    def _parse_role_ids(value: str) -> List[int]:
+        # Accept both the old "[1, 2]" format and the current "1,2" format.
+        value = str(value or "").strip().replace("[", "").replace("]", "")
+        result = []
+        for item in value.split(","):
+            item = item.strip().strip("'").strip('"')
+            if item:
+                try:
+                    result.append(int(item))
+                except ValueError:
+                    continue
+        return result
+
     async def get_autorole(self, guild_id: int) -> Dict[str, List[int]]:
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT bots, humans FROM autorole WHERE guild_id = ?", (guild_id,)) as cursor:
@@ -70,8 +84,8 @@ class AutoRole(commands.Cog):
                 if row:
                     bots, humans = row
                     
-                    bots = [int(role_id) for role_id in bots.replace('[', '').replace(']', '').replace(' ', '').split(',') if role_id]
-                    humans = [int(role_id) for role_id in humans.replace('[', '').replace(']', '').replace(' ', '').split(',') if role_id]
+                    bots = self._parse_role_ids(bots)
+                    humans = self._parse_role_ids(humans)
                       
                     return {"bots": bots, "humans": humans}
                 else:
@@ -232,7 +246,7 @@ class AutoRole(commands.Cog):
                 data = await cursor.fetchone()
         
         if data:
-            humans = eval(data[0])
+            humans = self._parse_role_ids(data[0])
             if role.id in humans:
                 view = CV2(f"{ICONS_WARNING} Access Denied", f"{role.mention} is already in human autoroles.")
             elif len(humans) >= 10:
@@ -303,7 +317,7 @@ class AutoRole(commands.Cog):
                 data = await cursor.fetchone()
         
         if data:
-            bots = eval(data[0])
+            bots = self._parse_role_ids(data[0])
             if role.id in bots:
                 view = CV2(f"{ICONS_WARNING} Access Denied", f"{role.mention} is already in bot autoroles.")
             elif len(bots) >= 10:
