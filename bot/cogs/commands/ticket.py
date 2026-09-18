@@ -451,16 +451,38 @@ class TicketActionsView(discord.ui.View):
         self.cog, self.ch_id, self.cat_id = cog, ch_id, cat_id
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        cat_info = self.cog.db.fetchone("SELECT notified_roles FROM ticket_categories WHERE category_id=?", (self.cat_id,))
-        if not cat_info or not cat_info['notified_roles']:
-            await interaction.response.send_message("This ticket is misconfigured; no staff roles are assigned.", ephemeral=True)
+        cat_info = self.cog.db.fetchone(
+            "SELECT notified_roles FROM ticket_categories WHERE category_id=?",
+            (self.cat_id,)
+        )
+        if not cat_info or not cat_info["notified_roles"]:
+            # Server managers can still operate tickets even if a staff-role
+            # configuration is missing.
+            perms = getattr(interaction.user, "guild_permissions", None)
+            if perms and (perms.manage_channels or perms.manage_guild):
+                return True
+            await interaction.response.send_message(
+                "This ticket is misconfigured; no staff roles are assigned.",
+                ephemeral=True
+            )
             return False
-        
-        allowed_role_ids = {int(r_id) for r_id in cat_info['notified_roles'].split(',')}
+
+        allowed_role_ids = set()
+        for value in cat_info["notified_roles"].split(","):
+            try:
+                allowed_role_ids.add(int(value))
+            except (TypeError, ValueError):
+                continue
+
         user_role_ids = {role.id for role in interaction.user.roles}
-        
-        if not user_role_ids.intersection(allowed_role_ids):
-            await interaction.response.send_message("You do not have the required role to perform this action.", ephemeral=True)
+        perms = getattr(interaction.user, "guild_permissions", None)
+
+        if not (user_role_ids.intersection(allowed_role_ids) or
+                (perms and (perms.manage_channels or perms.manage_guild))):
+            await interaction.response.send_message(
+                "You do not have the required staff role to perform this action.",
+                ephemeral=True
+            )
             return False
         return True
 
