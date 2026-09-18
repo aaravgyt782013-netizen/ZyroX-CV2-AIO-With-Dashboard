@@ -393,25 +393,48 @@ class Music(commands.Cog):
                     pass
 
     async def connect_nodes(self) -> None:
-        host = os.getenv("LAVALINK_HOST", "lava-v4.ajieblogs.eu.org")
-        password = os.getenv("LAVALINK_PASSWORD", "https://dsc.gg/ajidevserver")
-        secure = os.getenv("LAVALINK_SECURE", "true").strip().lower() == "true"
-        port = os.getenv("LAVALINK_PORT", "").strip()
+        primary_host = os.getenv("LAVALINK_HOST", "").strip()
+        primary_password = os.getenv("LAVALINK_PASSWORD", "").strip()
+        primary_secure = os.getenv("LAVALINK_SECURE", "true").strip().lower() == "true"
+        primary_port = os.getenv("LAVALINK_PORT", "").strip()
 
-        if secure:
-            uri = f"https://{host}"
-        else:
-            uri = f"http://{host}:{port}" if port else f"http://{host}"
+        configs = []
+        if primary_host and primary_password:
+            configs.append((primary_host, primary_port, primary_password, primary_secure, "primary"))
 
-        node = wavelink.Node(
-            uri=uri,
-            password=password,
-            retries=None,
-            resume_timeout=180,
-            inactive_player_timeout=None,
-        )
-        await wavelink.Pool.connect(nodes=[node], client=self.client, cache_capacity=None)
+        # Keep public v4 fallbacks available so one unhealthy public node does
+        # not interrupt playback. These are only fallbacks; an environment
+        # configured private node remains the primary.
+        configs.extend([
+            ("lavalinkv4.serenetia.com", "443", "https://seretia.link/discord", True, "serenetia"),
+            ("lava-v4.millohost.my.id", "443", "https://discord.gg/mjS5J2K3ep", True, "millohost"),
+        ])
 
+        nodes = []
+        seen = set()
+        for host, port, password, secure, identifier in configs:
+            key = (host, port, secure)
+            if key in seen:
+                continue
+            seen.add(key)
+            if secure:
+                uri = f"https://{host}:{port}" if port else f"https://{host}"
+            else:
+                uri = f"http://{host}:{port}" if port else f"http://{host}"
+            nodes.append(
+                wavelink.Node(
+                    identifier=identifier,
+                    uri=uri,
+                    password=password,
+                    retries=None,
+                    resume_timeout=180,
+                    inactive_player_timeout=None,
+                )
+            )
+
+        if not nodes:
+            raise RuntimeError("No Lavalink nodes are configured.")
+        await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
 
     async def display_player_embed(self, player, track, ctx, autoplay=False):
         await ctx.send(view=MusicControlView(player, ctx, track, autoplay))
