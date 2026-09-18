@@ -433,6 +433,38 @@ class TicketCog(commands.Cog, name="Ticket System"):
     async def setup(self, ctx, style: app_commands.Choice[str], channel: discord.TextChannel):
         await EmbedEditorView(self, ctx, channel, style.value).start(ctx.interaction)
 
+    @commands.hybrid_group(name="staff", description="Manage staff roles for ticket categories.")
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    async def staff(self, ctx):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Use `.ticket staff add @Role` or `.ticket staff remove @Role`.", ephemeral=True)
+
+    @staff.command(name="add", description="Add a staff role to the current ticket category.")
+    async def staff_add(self, ctx, role: discord.Role):
+        ticket = self.db.fetchone("SELECT category_db_id FROM open_tickets WHERE channel_id=?", (ctx.channel.id,))
+        if not ticket:
+            return await ctx.send("This command must be used inside a ticket.", ephemeral=True)
+        cat = self.db.fetchone("SELECT notified_roles FROM ticket_categories WHERE category_id=?", (ticket["category_db_id"],))
+        if not cat:
+            return await ctx.send("Ticket category configuration was not found.", ephemeral=True)
+        ids = [x for x in (cat["notified_roles"] or "").split(",") if x.isdigit()]
+        if str(role.id) not in ids: ids.append(str(role.id))
+        self.db.execute("UPDATE ticket_categories SET notified_roles=? WHERE category_id=?", (",".join(ids), ticket["category_db_id"]))
+        await ctx.send(f"{SUCCESS_EMOJI} Added {role.mention} as a staff role for this ticket category.")
+
+    @staff.command(name="remove", description="Remove a staff role from the current ticket category.")
+    async def staff_remove(self, ctx, role: discord.Role):
+        ticket = self.db.fetchone("SELECT category_db_id FROM open_tickets WHERE channel_id=?", (ctx.channel.id,))
+        if not ticket:
+            return await ctx.send("This command must be used inside a ticket.", ephemeral=True)
+        cat = self.db.fetchone("SELECT notified_roles FROM ticket_categories WHERE category_id=?", (ticket["category_db_id"],))
+        if not cat:
+            return await ctx.send("Ticket category configuration was not found.", ephemeral=True)
+        ids = [x for x in (cat["notified_roles"] or "").split(",") if x.isdigit() and x != str(role.id)]
+        self.db.execute("UPDATE ticket_categories SET notified_roles=? WHERE category_id=?", (",".join(ids) or None, ticket["category_db_id"]))
+        await ctx.send(f"{SUCCESS_EMOJI} Removed {role.mention} from the staff roles for this ticket category.")
+
     @ticket.command(name="close", description="Close the current ticket channel.")
     @commands.has_permissions(manage_channels=True)
     async def close(self, ctx): await self._dispatch_action(ctx, "close")
@@ -611,7 +643,6 @@ class ClosedTicketActionsView(discord.ui.View):
             ephemeral=True
         )
         return False
-
     @discord.ui.button(label="Reopen", emoji=REOPEN_EMOJI, style=discord.ButtonStyle.success)
     async def b_reopen(self, i: discord.Interaction, button: discord.ui.Button):
         await i.response.defer(ephemeral=True)
