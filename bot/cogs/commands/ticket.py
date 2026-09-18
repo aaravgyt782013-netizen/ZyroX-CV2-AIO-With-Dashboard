@@ -301,7 +301,8 @@ class CategoryChannelConfigView(discord.ui.View):
             return await interaction.response.send_message("Only the person running setup can configure this.", ephemeral=True)
         self.parent.categories[self.index]["log_channel_id"] = int(self.log_select.values[0])
         self.transcript_select.disabled = False
-        await interaction.response.edit_message(content=f"📋 Logs channel selected for **{self.parent.categories[self.index]["name"]}**. Now select the **Transcript** channel.", view=self)
+        name = self.parent.categories[self.index]["name"]
+        await interaction.response.edit_message(content=f"📋 Logs channel selected for **{name}**. Now select the **Transcript** channel.", view=self)
 
     async def _transcript(self, interaction):
         if interaction.user.id != self.parent.ctx.author.id:
