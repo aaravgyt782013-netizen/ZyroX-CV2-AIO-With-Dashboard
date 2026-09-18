@@ -113,7 +113,6 @@ class HelpCommand(commands.HelpCommand):
                   f" {ZTADA} `»` Giveaway\n"
                   f" {TICKET} `»` Ticket {NEW}\n"
                   f" {ZPEOPLE} `»` Invite Tracker {NEW}\n"
-                  f" {MESSAGE} `»` Embed Commands {NEW}\n"
         )
 
         embed.add_field(
