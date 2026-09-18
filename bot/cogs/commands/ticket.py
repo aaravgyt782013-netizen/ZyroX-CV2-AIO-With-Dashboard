@@ -418,7 +418,12 @@ class TicketCog(commands.Cog, name="Ticket System"):
         
         ticket_embed = discord.Embed(title=f"Welcome to your Ticket ( #{t_num:04d} )", description="Thank you for reaching out for support. Our staff team has been notified and will be with you as soon as possible.\n\nPlease describe your issue in detail while you wait.", color=EMBED_COLOR)
         ticket_embed.set_image(url=TICKET_CHANNEL_IMAGE_URL)
-        await ch.send(content=" ".join(pings), embed=ticket_embed, view=TicketActionsView(self, ch.id, cat_id))
+        await ch.send(
+            content=" ".join(pings),
+            embed=ticket_embed,
+            view=TicketActionsView(self, ch.id, cat_id),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False)
+        )
         await inter.followup.send(f"Your ticket has been successfully created: {ch.mention}", ephemeral=True)
 
     @commands.hybrid_group(name="ticket", description="Main command group for the ticket system.")
@@ -521,40 +526,41 @@ class TicketActionsView(discord.ui.View):
         self.cog, self.ch_id, self.cat_id = cog, ch_id, cat_id
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Resolve the staff roles from the saved ticket category. Older tickets
+        # can point at a category DB row that was replaced during a later setup,
+        # so fall back to the Discord category containing this ticket.
         cat_info = self.cog.db.fetchone(
             "SELECT notified_roles FROM ticket_categories WHERE category_id=?",
             (self.cat_id,)
         )
-        if not cat_info or not cat_info["notified_roles"]:
-            # Server managers can still operate tickets even if a staff-role
-            # configuration is missing.
-            perms = getattr(interaction.user, "guild_permissions", None)
-            if perms and (perms.manage_channels or perms.manage_guild):
-                return True
-            await interaction.response.send_message(
-                "This ticket is misconfigured; no staff roles are assigned.",
-                ephemeral=True
+        if not cat_info and interaction.channel and interaction.channel.category_id:
+            cat_info = self.cog.db.fetchone(
+                "SELECT notified_roles FROM ticket_categories WHERE guild_id=? AND discord_category_id=?",
+                (interaction.guild.id, interaction.channel.category_id)
             )
-            return False
 
         allowed_role_ids = set()
-        for value in cat_info["notified_roles"].split(","):
-            try:
-                allowed_role_ids.add(int(value))
-            except (TypeError, ValueError):
-                continue
+        if cat_info and cat_info["notified_roles"]:
+            for value in cat_info["notified_roles"].split(","):
+                try:
+                    allowed_role_ids.add(int(value))
+                except (TypeError, ValueError):
+                    continue
 
         user_role_ids = {role.id for role in interaction.user.roles}
         perms = getattr(interaction.user, "guild_permissions", None)
+        is_manager = bool(perms and (perms.manage_channels or perms.manage_guild))
 
-        if not (user_role_ids.intersection(allowed_role_ids) or
-                (perms and (perms.manage_channels or perms.manage_guild))):
-            await interaction.response.send_message(
-                "You do not have the required staff role to perform this action.",
-                ephemeral=True
-            )
-            return False
-        return True
+        if is_manager or user_role_ids.intersection(allowed_role_ids):
+            return True
+
+        if not cat_info:
+            message = "This ticket is not linked to a ticket category configuration."
+        else:
+            message = "You do not have the configured staff role for this ticket."
+
+        await interaction.response.send_message(message, ephemeral=True)
+        return False
 
     @discord.ui.button(label="Lock", emoji=LOCK_EMOJI, custom_id="t_lock", style=discord.ButtonStyle.secondary)
     async def b_lock(self, i, b):
@@ -627,13 +633,19 @@ class ClosedTicketActionsView(discord.ui.View):
             "SELECT notified_roles FROM ticket_categories WHERE category_id=?",
             (self.cat_id,)
         )
+        if not cat_info and interaction.channel and interaction.channel.category_id:
+            cat_info = self.cog.db.fetchone(
+                "SELECT notified_roles FROM ticket_categories WHERE guild_id=? AND discord_category_id=?",
+                (interaction.guild.id, interaction.channel.category_id)
+            )
+
         allowed_role_ids = set()
         if cat_info and cat_info["notified_roles"]:
             for value in cat_info["notified_roles"].split(","):
                 try:
                     allowed_role_ids.add(int(value))
                 except (TypeError, ValueError):
-                    pass
+                    continue
 
         user_role_ids = {role.id for role in interaction.user.roles}
         perms = getattr(interaction.user, "guild_permissions", None)
