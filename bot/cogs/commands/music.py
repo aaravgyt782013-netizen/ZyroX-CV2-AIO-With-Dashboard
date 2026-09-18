@@ -360,19 +360,20 @@ class Music(commands.Cog):
                 player = vc
                 break
 
-        if player and player.playing and len(player.channel.members) == 1:
+        # Never disconnect while a track is actively playing.
+        # Being alone in VC is not inactivity while music is playing.
+        if player and not player.playing:
             await self.inactivity_timer(guild)
 
     async def inactivity_timer(self, guild):
         await asyncio.sleep(self.inactivity_timeout)
-        if len(guild.voice_channels[0].members) == 1:
-            player = None
-            for vc in self.client.voice_clients:
-                if vc.guild.id == guild.id:
-                    player = vc
-                    break
-            if player:
-                await player.disconnect(force=True)
+        player = None
+        for vc in self.client.voice_clients:
+            if vc.guild.id == guild.id:
+                player = vc
+                break
+        if player and not player.playing and len(player.channel.members) == 1:
+            await player.disconnect(force=True)
                 try:
                     support = Button(label='Support', style=discord.ButtonStyle.link, url='https://discord.gg/codexdev')
                     vote = Button(label='Vote', style=discord.ButtonStyle.link, url='https://top.gg/bot//vote')
@@ -402,8 +403,14 @@ class Music(commands.Cog):
         else:
             uri = f"http://{host}:{port}" if port else f"http://{host}"
 
-        nodes = [wavelink.Node(uri=uri, password=password)]
-        await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
+        node = wavelink.Node(
+            uri=uri,
+            password=password,
+            retries=None,
+            resume_timeout=180,
+            inactive_player_timeout=None,
+        )
+        await wavelink.Pool.connect(nodes=[node], client=self.client, cache_capacity=None)
 
 
     async def display_player_embed(self, player, track, ctx, autoplay=False):
@@ -977,6 +984,32 @@ class Music(commands.Cog):
 
             if len(track_histories[guild_id]) > 10:
                 track_histories[guild_id].pop(0)
+
+    @commands.Cog.listener()
+    async def on_wavelink_track_exception(self, payload):
+        player = payload.player
+        track = getattr(payload, "track", None) or getattr(player, "current", None)
+        if not player or not track:
+            return
+        try:
+            await asyncio.sleep(1)
+            if player.current == track and not player.playing:
+                await player.play(track)
+        except Exception:
+            pass
+
+    @commands.Cog.listener()
+    async def on_wavelink_track_stuck(self, payload):
+        player = payload.player
+        track = getattr(payload, "track", None) or getattr(player, "current", None)
+        if not player or not track:
+            return
+        try:
+            await asyncio.sleep(1)
+            if player.current == track and not player.playing:
+                await player.play(track)
+        except Exception:
+            pass
 
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
