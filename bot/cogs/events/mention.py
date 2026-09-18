@@ -69,8 +69,6 @@ class Mention(commands.Cog):
         self.color = 0xFF0000
         self.bot_name = BotName
         # TempVoice and its Join-to-Create listener are loaded centrally by bot/cogs/__init__.py.
-        except Exception as exc:
-            print(f"TempVoice registration error: {exc}")
 
     async def is_blacklisted(self, message):
         async with aiosqlite.connect("db/block.db") as db:
