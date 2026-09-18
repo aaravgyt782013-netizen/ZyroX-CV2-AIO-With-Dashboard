@@ -105,13 +105,38 @@ class View(LayoutView):
             while label in used_labels: label = f"{original_label} {counter}"; counter += 1
             used_labels.add(label); options.append(discord.SelectOption(label=label, emoji=emoji, description=(description or "Commands")[:100]))
             commands_for_help = []
-            for command in cog.get_commands():
-                commands_for_help.append(command)
-                if isinstance(command, commands.GroupMixin):
-                    commands_for_help.extend(command.commands)
-            if cog.__class__.__name__ == "_voice":
-                tempvoice = self.ctx.bot.get_cog("TempVoice")
-                if tempvoice: commands_for_help.extend(tempvoice.get_commands())
+            seen = set()
+
+            def add_commands(source):
+                if source is None:
+                    return
+                for command in source.get_commands():
+                    if command.name not in seen:
+                        commands_for_help.append(command)
+                        seen.add(command.name)
+                    if isinstance(command, commands.GroupMixin):
+                        for child in command.commands:
+                            key = child.qualified_name
+                            if key not in seen:
+                                commands_for_help.append(child)
+                                seen.add(key)
+
+            # Category cogs contain the help labels, while the real command
+            # cogs contain the actual commands. Merge both so help pages never
+            # show an empty category.
+            add_commands(cog)
+            label_key = original_label.lower()
+            source_names = []
+            if "music" in label_key:
+                source_names = ["Music", "Music247"]
+            elif "embed" in label_key:
+                source_names = ["Embed"]
+            elif "voice" in label_key:
+                source_names = ["Voice", "TempVoice"]
+            elif "ticket" in label_key:
+                source_names = ["TicketCog"]
+            for source_name in source_names:
+                add_commands(self.ctx.bot.get_cog(source_name))
             fields = []
             for command in commands_for_help:
                 params = ''.join(f" <{p}>" for p in command.clean_params if p not in ["self", "ctx"])
