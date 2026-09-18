@@ -13,6 +13,7 @@ from .commands.music_24_7 import Music247
 from .commands.prefix import Prefix
 from .commands.purge import Purge
 from .commands.automod import Automod
+from .commands.automod_listener import AutomodListener
 from .commands.welcome import Welcomer
 from .commands.fun import Fun
 from .commands.Games import Games
@@ -172,6 +173,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(Prefix(bot))
     await bot.add_cog(Purge(bot))
     await bot.add_cog(Automod(bot))
+    await bot.add_cog(AutomodListener(bot))
     # Automod event listeners (these enforce the configured rules).
     await bot.add_cog(AntiSpam(bot))
     await bot.add_cog(AntiCaps(bot))
@@ -187,7 +189,8 @@ async def setup(bot: zyrox):
     await bot.add_cog(Voice(bot))
     await bot.add_cog(Owner(bot))
     await bot.add_cog(Customrole(bot))
-    # Autorole listener (assign configured roles when members join).
+    # Autorole command + listener (configure and assign roles when members join).
+    await bot.add_cog(AutoRole(bot))
     await bot.add_cog(Autorole2(bot))
     # Role moderation command group.
     await bot.add_cog(Role(bot))
