@@ -185,7 +185,7 @@ class CategoryConfigView(discord.ui.View):
     
     def _update_embed(self):
         embed = discord.Embed(title="Category Configuration", description="Add or remove ticket categories for your panel.", color=EMBED_COLOR)
-        embed.add_field(name="Current Categories", value="\n".join([f"{c['emoji'] or ''} {c['name']}" for c in self.categories]) or "None yet. Click 'Add Category' to begin.")
+        embed.add_field(name="Current Categories", value="\n".join([f"{c['emoji'] or ''} {c['name']} → <#{c['discord_category_id']}>" if c.get("discord_category_id") else f"{c['emoji'] or ''} {c['name']} → category not selected" for c in self.categories]) or "None yet. Click 'Add Category' to begin.")
         return embed
 
     def _update_remove_select(self):
@@ -232,13 +232,14 @@ class CategoryConfigView(discord.ui.View):
             "name": cat_name, "emoji": emoji,
             "notified_roles": ",".join(map(str, role_ids)) if role_ids else None,
             "button_style": discord.ButtonStyle.secondary.value,
+            "discord_category_id": None,
             "log_channel_id": None, "transcript_channel_id": None
         })
 
-        # Immediately configure the two destinations for THIS category before allowing another category.
+        # First choose the Discord category where this ticket type will open.
         await inter.followup.send(
-            f"✅ **{cat_name}** details saved. Now select the **Logs** channel for this category.",
-            view=CategoryChannelConfigView(self, len(self.categories) - 1, step="logs"),
+            f"✅ **{cat_name}** details saved. Now select the **Discord category where tickets for this type should open**.",
+            view=TicketOpenCategorySelectView(self, len(self.categories) - 1),
             ephemeral=True
         )
 
@@ -268,10 +269,9 @@ class CategoryConfigView(discord.ui.View):
         db, guild_id = self.cog.db, self.ctx.guild.id
         db.execute("DELETE FROM ticket_categories WHERE guild_id = ?", (guild_id,))
         for cat in self.categories:
-            try:
-                cat_ch = await self.ctx.guild.create_category(f"{cat['name']} Tickets", overwrites={self.ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False)})
-            except:
-                return await inter.followup.send(f"Can't create category for {cat['name']}.", ephemeral=True)
+            cat_ch = self.ctx.guild.get_channel(cat.get("discord_category_id"))
+            if not isinstance(cat_ch, discord.CategoryChannel):
+                return await inter.followup.send(f"Please select a valid ticket-open category for **{cat['name']}**.", ephemeral=True)
             db.execute("INSERT INTO ticket_categories (guild_id,name,emoji,notified_roles,button_style,discord_category_id,log_channel_id,transcript_channel_id) VALUES (?,?,?,?,?,?,?,?)", (guild_id,cat["name"],cat["emoji"],cat["notified_roles"],cat["button_style"],cat_ch.id,cat["log_channel_id"],cat["transcript_channel_id"]))
         config = db.fetchone("SELECT * FROM guild_configs WHERE guild_id=?", (guild_id,))
         panel_ch = self.ctx.guild.get_channel(config["panel_channel_id"])
@@ -283,6 +283,34 @@ class CategoryConfigView(discord.ui.View):
         db.execute("UPDATE guild_configs SET panel_message_id = ? WHERE guild_id = ?", (msg.id, guild_id))
         await inter.followup.send(f"{SUCCESS_EMOJI} Setup complete! Panel sent to {panel_ch.mention}.", ephemeral=True)
         self.stop()
+
+class TicketOpenCategorySelectView(discord.ui.View):
+    def __init__(self, parent, index):
+        super().__init__(timeout=600)
+        self.parent, self.index = parent, index
+        self.select = discord.ui.ChannelSelect(
+            placeholder="Select the ticket-open category...",
+            channel_types=[discord.ChannelType.category],
+            min_values=1,
+            max_values=1,
+        )
+        self.select.callback = self._selected
+        self.add_item(self.select)
+
+    async def _selected(self, interaction):
+        if interaction.user.id != self.parent.ctx.author.id:
+            return await interaction.response.send_message("Only the person running setup can configure this.", ephemeral=True)
+        category = interaction.guild.get_channel(int(self.select.values[0]))
+        if not isinstance(category, discord.CategoryChannel):
+            return await interaction.response.send_message("Please select a server category.", ephemeral=True)
+        self.parent.categories[self.index]["discord_category_id"] = category.id
+        name = self.parent.categories[self.index]["name"]
+        self.stop()
+        await interaction.response.edit_message(
+            content=f"📂 Tickets for **{name}** will open in **{category.name}**. Now select the **Logs** channel.",
+            view=CategoryChannelConfigView(self.parent, self.index, step="logs"),
+        )
+
 
 class CategoryChannelConfigView(discord.ui.View):
     def __init__(self, parent, index, step="logs"):
