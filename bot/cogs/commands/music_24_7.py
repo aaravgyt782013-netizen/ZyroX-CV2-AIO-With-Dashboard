@@ -35,7 +35,8 @@ def _patch_music_class():
             configs = [
                 {"host": "lavalinkv4.serenetia.com", "port": 443, "password": "https://seretia.link/discord", "secure": True},
                 {"host": "lava-v4.millohost.my.id", "port": 443, "password": "https://discord.gg/mjS5J2K3ep", "secure": True},
-                {"host": "lava-v4.ajieblogs.eu.org", "port": 80, "password": "https://dsc.gg/ajidevserver", "secure": False},
+                {"host": "lavalink.triniumhost.com", "port": 4333, "password": "free", "secure": False},
+                {"host": "n3.nexcloud.in", "port": 2026, "password": "nexcloud", "secure": False},
             ]
         nodes = []
         for index, item in enumerate(configs):
