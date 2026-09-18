@@ -1,4 +1,6 @@
 import re
+import json
+import sqlite3
 from typing import Optional
 
 import discord
@@ -7,6 +9,14 @@ from discord.ext import commands
 from utils.emoji import CROSS, TICK, MESSAGE, ZWARNING
 
 COLOR_DEFAULT = 0xFF0000
+EMBED_DB = "saved_embeds.db"
+
+def _embed_db():
+    conn = sqlite3.connect(EMBED_DB)
+    conn.row_factory = sqlite3.Row
+    conn.execute("CREATE TABLE IF NOT EXISTS saved_embeds (guild_id INTEGER NOT NULL, name TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY (guild_id, name))")
+    conn.commit()
+    return conn
 
 
 class BasicModal(discord.ui.Modal):
@@ -125,12 +135,13 @@ class FieldModal(discord.ui.Modal):
 class EmbedBuilder(discord.ui.View):
     """Interactive Mimu-style embed builder for LightCore."""
 
-    def __init__(self, ctx: commands.Context):
+    def __init__(self, ctx: commands.Context, save_name: Optional[str] = None, initial_data: Optional[dict] = None):
         super().__init__(timeout=600)
         self.ctx = ctx
+        self.save_name = save_name
         self.message: Optional[discord.Message] = None
         self.destination = ctx.channel
-        self.data = {
+        self.data = initial_data or {
             "title": "", "description": "", "url": "", "color": COLOR_DEFAULT,
             "timestamp": False, "author_name": "", "author_icon": "", "author_url": "",
             "footer_text": "", "footer_icon": "", "thumbnail": "", "image": "", "fields": [],
@@ -258,7 +269,14 @@ class EmbedBuilder(discord.ui.View):
             return await interaction.response.send_message(f"{ZWARNING} I cannot send embeds in {self.destination.mention}.", ephemeral=True)
         except discord.HTTPException as exc:
             return await interaction.response.send_message(f"{CROSS} Discord rejected the embed: `{exc}`", ephemeral=True)
-        await interaction.response.send_message(f"{TICK} Embed sent to {self.destination.mention}.", ephemeral=True)
+        if self.save_name:
+            conn = _embed_db()
+            conn.execute("INSERT OR REPLACE INTO saved_embeds (guild_id, name, payload) VALUES (?, ?, ?)", (self.ctx.guild.id, self.save_name.lower(), json.dumps(self.data)))
+            conn.commit()
+            conn.close()
+            await interaction.response.send_message(f"{TICK} Saved embed **{self.save_name}** and sent it to {self.destination.mention}.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"{TICK} Embed sent to {self.destination.mention}.", ephemeral=True)
         self.stop()
 
     async def _cancel(self, interaction):
@@ -299,6 +317,61 @@ class Embed(commands.Cog):
     async def embed_setup(self, ctx: commands.Context):
         builder = EmbedBuilder(ctx)
         builder.message = await ctx.send(embed=builder._build_embed(), view=builder)
+
+
+    @embed.command(name="add", description="Create, save, and send a named embed.")
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.describe(name="Name for the saved embed.")
+    async def embed_add(self, ctx: commands.Context, name: str):
+        name = name.strip()
+        if not name or len(name) > 50:
+            return await ctx.send("❌ Embed name must be between 1 and 50 characters.", delete_after=5)
+        builder = EmbedBuilder(ctx, save_name=name)
+        builder.message = await ctx.send(embed=builder._build_embed(), view=builder)
+
+    @embed.command(name="list", description="List saved embeds in this server.")
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    async def embed_list(self, ctx: commands.Context):
+        conn = _embed_db()
+        rows = conn.execute("SELECT name FROM saved_embeds WHERE guild_id=? ORDER BY name", (ctx.guild.id,)).fetchall()
+        conn.close()
+        if not rows:
+            return await ctx.send("No saved embeds yet. Use .embed add <name>.", delete_after=8)
+        description = "\n".join("- " + row["name"] for row in rows)
+        await ctx.send(embed=discord.Embed(title="Saved Embeds", description=description, color=COLOR_DEFAULT))
+
+    @embed.command(name="delete", description="Delete a saved embed.")
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.describe(name="Name of the saved embed to delete.")
+    async def embed_delete(self, ctx: commands.Context, name: str):
+        conn = _embed_db()
+        cur = conn.execute("DELETE FROM saved_embeds WHERE guild_id=? AND name=?", (ctx.guild.id, name.strip().lower()))
+        conn.commit()
+        conn.close()
+        if not cur.rowcount:
+            return await ctx.send(f"❌ No saved embed named **{name}**.", delete_after=5)
+        await ctx.send(f"{TICK} Deleted saved embed **{name}**.")
+
+    @embed.command(name="send", description="Send a saved embed to a channel.")
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.describe(name="Saved embed name.", channel="Destination channel.")
+    async def embed_send(self, ctx: commands.Context, name: str, channel: Optional[discord.TextChannel] = None):
+        conn = _embed_db()
+        row = conn.execute("SELECT payload FROM saved_embeds WHERE guild_id=? AND name=?", (ctx.guild.id, name.strip().lower())).fetchone()
+        conn.close()
+        if not row:
+            return await ctx.send(f"❌ No saved embed named **{name}**.", delete_after=5)
+        builder = EmbedBuilder(ctx, initial_data=json.loads(row["payload"]))
+        destination = channel or ctx.channel
+        try:
+            await destination.send(embed=builder._build_embed())
+            await ctx.send(f"{TICK} Sent **{name}** to {destination.mention}.", delete_after=5)
+        except discord.HTTPException as exc:
+            await ctx.send(f"❌ Discord rejected the embed: {exc}", delete_after=8)
 
 
 async def setup(bot):
