@@ -73,6 +73,8 @@ from .commands.Birthday import Birthdays
 from .commands.nitro import Nitro
 from .commands.image import ImageCommands
 from .commands.youtube import Youtube
+from .commands.tempvoice import TempVoice
+from .commands.tempvoice_event_fix import TempVoiceEventFix
 
 # Events
 from .events.Errors import Errors
@@ -224,6 +226,8 @@ async def setup(bot: zyrox):
     await bot.add_cog(Nitro(bot))
     await bot.add_cog(ImageCommands(bot))
     await bot.add_cog(Youtube(bot))
+    await bot.add_cog(TempVoice(bot))
+    await bot.add_cog(TempVoiceEventFix(bot))
 
     await bot.add_cog(_antinuke(bot))
     await bot.add_cog(_extra(bot))
