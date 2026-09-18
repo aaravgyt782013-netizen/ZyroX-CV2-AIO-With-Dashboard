@@ -133,6 +133,19 @@ class HelpCommand(commands.HelpCommand):
                   f" {ZCIRCLE_ALT1} `»` Customrole\n"
         )
 
+        embed.add_field(
+            name="⚡ Quick Commands",
+            value=(
+                f"\`{prefix}help\` • Open this menu\n"
+                f"\`{prefix}play <song>\` • Play music\n"
+                f"\`{prefix}embed add <name>\` • Create a saved embed\n"
+                f"\`{prefix}embed list\` • List saved embeds\n"
+                f"\`{prefix}ticket setup\` • Configure tickets\n"
+                f"\`{prefix}tempvoice setup\` • Configure TempVoice"
+            ),
+            inline=False,
+        )
+
         embed.set_footer(text=f"Requested By {ctx.author} | [Support]({serverLink})")
 
         try:
