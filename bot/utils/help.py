@@ -1,4 +1,5 @@
 import discord
+from discord.ext import commands
 from utils.Tools import *
 from utils.cv2 import build_container
 from utils.emoji import REWIND, PREVIOUS, NEXT, FORWARD, DELETE, HOME
@@ -103,7 +104,11 @@ class View(LayoutView):
             emoji, label, description = cog.help_custom(); original_label = label; counter = 1
             while label in used_labels: label = f"{original_label} {counter}"; counter += 1
             used_labels.add(label); options.append(discord.SelectOption(label=label, emoji=emoji, description=(description or "Commands")[:100]))
-            commands_for_help = list(cog.get_commands())
+            commands_for_help = []
+            for command in cog.get_commands():
+                commands_for_help.append(command)
+                if isinstance(command, commands.GroupMixin):
+                    commands_for_help.extend(command.commands)
             if cog.__class__.__name__ == "_voice":
                 tempvoice = self.ctx.bot.get_cog("TempVoice")
                 if tempvoice: commands_for_help.extend(tempvoice.get_commands())
