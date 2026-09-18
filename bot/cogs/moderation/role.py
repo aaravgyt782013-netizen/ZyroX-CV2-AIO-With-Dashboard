@@ -282,7 +282,7 @@ class Role(commands.Cog):
   @commands.guild_only()
   @commands.has_permissions(administrator=True)
   async def role_humans(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -365,7 +365,7 @@ class Role(commands.Cog):
   @commands.guild_only()
   @commands.has_permissions(administrator=True)
   async def role_bots(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -448,7 +448,7 @@ class Role(commands.Cog):
   @commands.guild_only()
   @commands.has_permissions(administrator=True)
   async def role_unverified(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -526,7 +526,7 @@ class Role(commands.Cog):
   @commands.guild_only()
   @commands.has_permissions(administrator=True)
   async def role_all(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -621,7 +621,7 @@ class Role(commands.Cog):
   @commands.cooldown(1, 10, commands.BucketType.user)
   @commands.has_permissions(administrator=True)
   async def rrole_humans(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -703,7 +703,7 @@ class Role(commands.Cog):
   @commands.cooldown(1, 10, commands.BucketType.user)
   @commands.has_permissions(administrator=True)
   async def rrole_bots(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -785,7 +785,7 @@ class Role(commands.Cog):
   @commands.cooldown(1, 10, commands.BucketType.user)
   @commands.has_permissions(administrator=True)
   async def rrole_all(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Confirm",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
@@ -865,7 +865,7 @@ class Role(commands.Cog):
   @commands.cooldown(1, 10, commands.BucketType.user)
   @commands.has_permissions(administrator=True)
   async def rrole_unverified(self, ctx, *, role: discord.Role):
-    if ctx.author == ctx.guild.owner or ctx.author.top_role.position > ctx.guild.me.top_role.position:
+    if ctx.author == ctx.guild.owner or role.position < ctx.author.top_role.position:
         button = Button(label="Yes",
                         style=discord.ButtonStyle.green,
                         emoji=f"{TICK}>")
