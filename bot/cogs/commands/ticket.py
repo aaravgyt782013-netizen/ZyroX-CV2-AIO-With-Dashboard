@@ -217,31 +217,30 @@ class CategoryConfigView(discord.ui.View):
 
         cat_name = await self._prompt(inter, "Please type the name for the new category (e.g., General Support).", followup=True)
         if not cat_name: return await inter.followup.send("Timed out.", ephemeral=True)
-
-        emoji = await self._prompt(inter, 'Please provide an emoji for the category, or type `skip`.', followup=True)
+        emoji = await self._prompt(inter, "Please provide an emoji for the category, or type `skip`.", followup=True)
         if not emoji: return await inter.followup.send("Timed out.", ephemeral=True)
-        if emoji.lower() == 'skip': emoji = None
-
-        role_input = await self._prompt(inter, 'Please mention one or more staff roles to ping, separated by spaces (e.g., `@Ticket Support @Moderator`), or type `none`.', followup=True)
+        if emoji.lower() == "skip": emoji = None
+        role_input = await self._prompt(inter, "Please mention one or more staff roles to ping, separated by spaces, or type `none`.", followup=True)
         if not role_input: return await inter.followup.send("Timed out.", ephemeral=True)
-        
+
         role_ids = []
-        if role_input.lower() != 'none':
-            role_mentions = re.findall(r'<@&(\d+)>', role_input)
-            for role_id_str in role_mentions:
+        if role_input.lower() != "none":
+            for role_id_str in re.findall(r"<@&(\\d+)>", role_input):
                 role_ids.append(int(role_id_str))
-        
+
         self.categories.append({
-            "name": cat_name, 
-            "emoji": emoji,
-            "notified_roles": ",".join(map(str, role_ids)) if role_ids else None, 
+            "name": cat_name, "emoji": emoji,
+            "notified_roles": ",".join(map(str, role_ids)) if role_ids else None,
             "button_style": discord.ButtonStyle.secondary.value,
-            "log_channel_id": None,
-            "transcript_channel_id": None
+            "log_channel_id": None, "transcript_channel_id": None
         })
-        self._update_remove_select()
-        await self.message.edit(embed=self._update_embed(), view=self)
-        await inter.followup.send(f"Category '{cat_name}' added/removed successfully.", ephemeral=True)
+
+        # Immediately configure the two destinations for THIS category before allowing another category.
+        await inter.followup.send(
+            f"✅ **{cat_name}** details saved. Now select the **Logs** channel for this category.",
+            view=CategoryChannelConfigView(self, len(self.categories) - 1, step="logs"),
+            ephemeral=True
+        )
 
     async def _remove_category(self, inter, value):
         if value == "placeholder": return await inter.response.defer()
@@ -258,18 +257,11 @@ class CategoryConfigView(discord.ui.View):
     async def _finish_setup(self, inter):
         if not self.categories:
             return await inter.response.send_message("Add at least one category.", ephemeral=True)
-        await inter.response.send_message("Now configure the **Logs** and **Transcript** channel for each category.", ephemeral=True)
-        await self._configure_category_at(inter, 0)
-
-    async def _configure_category_at(self, inter, index):
-        if index >= len(self.categories):
-            await self._finalize_setup(inter)
-            return
-        cat = self.categories[index]
-        view = CategoryChannelConfigView(self, index)
-        embed = discord.Embed(title=f"Category {index + 1}/{len(self.categories)} — {cat['name']}", description="Select the channel for ticket logs and the channel where transcripts will be stored. These are configured separately for this category.", color=EMBED_COLOR)
-        await inter.followup.send(embed=embed, view=view, ephemeral=True)
-        view.message = await inter.original_response()
+        incomplete = [c["name"] for c in self.categories if not c.get("log_channel_id") or not c.get("transcript_channel_id")]
+        if incomplete:
+            return await inter.response.send_message("Please finish the Logs and Transcript channel selection for: " + ", ".join(incomplete), ephemeral=True)
+        await inter.response.defer()
+        await self._finalize_setup(inter)
 
     async def _finalize_setup(self, inter):
         await inter.followup.send("Creating your ticket categories and panel...", ephemeral=True)
@@ -293,26 +285,34 @@ class CategoryConfigView(discord.ui.View):
         self.stop()
 
 class CategoryChannelConfigView(discord.ui.View):
-    def __init__(self, parent, index):
+    def __init__(self, parent, index, step="logs"):
         super().__init__(timeout=600)
-        self.parent, self.index, self.message = parent, index, None
+        self.parent, self.index, self.step = parent, index, step
         self.log_select = discord.ui.ChannelSelect(placeholder="Select the LOGS channel...", channel_types=[discord.ChannelType.text], min_values=1, max_values=1)
         self.transcript_select = discord.ui.ChannelSelect(placeholder="Select the TRANSCRIPT channel...", channel_types=[discord.ChannelType.text], min_values=1, max_values=1)
         self.log_select.callback = self._log
         self.transcript_select.callback = self._transcript
-        self.add_item(self.log_select); self.add_item(self.transcript_select)
+        self.add_item(self.log_select)
+        self.add_item(self.transcript_select)
+        self.transcript_select.disabled = True
 
     async def _log(self, interaction):
-        if interaction.user.id != self.parent.ctx.author.id: return await interaction.response.send_message("Only the person running setup can configure this.", ephemeral=True)
+        if interaction.user.id != self.parent.ctx.author.id:
+            return await interaction.response.send_message("Only the person running setup can configure this.", ephemeral=True)
         self.parent.categories[self.index]["log_channel_id"] = int(self.log_select.values[0])
-        await interaction.response.send_message("✅ Logs channel saved. Now select the transcript channel.", ephemeral=True)
+        self.transcript_select.disabled = False
+        await interaction.response.edit_message(content=f"📋 Logs channel selected for **{self.parent.categories[self.index]["name"]}**. Now select the **Transcript** channel.", view=self)
 
     async def _transcript(self, interaction):
-        if interaction.user.id != self.parent.ctx.author.id: return await interaction.response.send_message("Only the person running setup can configure this.", ephemeral=True)
+        if interaction.user.id != self.parent.ctx.author.id:
+            return await interaction.response.send_message("Only the person running setup can configure this.", ephemeral=True)
         self.parent.categories[self.index]["transcript_channel_id"] = int(self.transcript_select.values[0])
-        await interaction.response.send_message("✅ Transcript channel saved.", ephemeral=True)
+        name = self.parent.categories[self.index]["name"]
         self.stop()
-        await self.parent._configure_category_at(interaction, self.index + 1)
+        await interaction.response.edit_message(content=f"✅ **{name}** is fully configured. Logs and transcript channels saved.", view=None)
+        self.parent._update_remove_select()
+        await self.parent.message.edit(embed=self.parent._update_embed(), view=self.parent)
+
 
 class TicketCog(commands.Cog, name="Ticket System"):
     def __init__(self, bot):
