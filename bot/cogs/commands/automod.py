@@ -12,6 +12,7 @@
 # ║                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
+import os
 import discord
 from utils.emoji import CROSS, DISABLE, ENABLE, TICK, TICK_ALT
 from discord.ext import commands
@@ -20,6 +21,8 @@ from utils.Tools import *
 from utils.cv2 import CV2, build_container
 from discord.ui import LayoutView, TextDisplay, Separator, Container, ActionRow
 from utils.config import *
+os.makedirs('db', exist_ok=True)
+
 class CV2(LayoutView):
     def __init__(self, title, *sections):
         super().__init__(timeout=None)
@@ -202,10 +205,6 @@ class Automod(commands.Cog):
     @commands.bot_has_permissions(manage_guild=True)
     async def enable(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
-            await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
-            return
-            
         if await self.is_automod_enabled(guild_id):
             await ctx.send(view=CV2(f"Automod Settings for {ctx.guild.name}", f"**{CROSS} Your Server already has Automoderation Enabled.**\n\nCurrent Status: {ENABLE} Enabled\nTo Disable use `{ctx.prefix}automod disable`"))
             return
