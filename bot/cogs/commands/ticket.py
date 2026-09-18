@@ -521,7 +521,7 @@ class TicketActionsView(discord.ui.View):
         if not allowed_role_ids and interaction.channel:
             for target, overwrite in interaction.channel.overwrites.items():
                 if isinstance(target, discord.Role) and not target.is_default():
-                    if overwrite.view_channel is True and overwrite.send_messages is True:
+                    if overwrite.view_channel is True:
                         allowed_role_ids.add(target.id)
 
         user_role_ids = {role.id for role in interaction.user.roles}
