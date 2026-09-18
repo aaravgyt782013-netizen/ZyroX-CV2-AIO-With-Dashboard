@@ -286,10 +286,17 @@ class Embed(commands.Cog):
     def help_custom(self):
         return MESSAGE, "Embed Commands", "Create interactive embeds with buttons and modals"
 
-    @commands.command(name="embed", aliases=["embeds", "embedbuilder"], help="Open the interactive embed builder.", usage="embed")
+    @commands.hybrid_group(name="embed", aliases=["embeds", "embedbuilder"], invoke_without_command=True, description="Create and customize Discord embeds.")
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     async def embed(self, ctx: commands.Context):
+        builder = EmbedBuilder(ctx)
+        builder.message = await ctx.send(embed=builder._build_embed(), view=builder)
+
+    @embed.command(name="setup", description="Open the interactive embed builder.", with_app_command=True)
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    async def embed_setup(self, ctx: commands.Context):
         builder = EmbedBuilder(ctx)
         builder.message = await ctx.send(embed=builder._build_embed(), view=builder)
 
