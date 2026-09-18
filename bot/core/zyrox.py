@@ -1,5 +1,6 @@
 from __future__ import annotations
 from discord.ext import commands, tasks
+from discord import app_commands
 import discord
 import aiohttp
 import json
@@ -16,6 +17,31 @@ import importlib
 import inspect
 
 init(autoreset=True)
+
+# Owner bypass: bot owners may run commands even when a command normally
+# requires a Discord permission/role. This is intentionally limited to
+# OWNER_IDS from utils.config.
+if not getattr(commands.Command, "_lightcore_owner_bypass", False):
+    _lightcore_original_can_run = commands.Command.can_run
+
+    async def _lightcore_owner_can_run(self, ctx):
+        if getattr(ctx, "author", None) is not None and ctx.author.id in OWNER_IDS:
+            return True
+        return await _lightcore_original_can_run(self, ctx)
+
+    commands.Command.can_run = _lightcore_owner_can_run
+    commands.Command._lightcore_owner_bypass = True
+
+if not getattr(app_commands.Command, "_lightcore_owner_bypass", False):
+    _lightcore_original_app_can_run = app_commands.Command._check_can_run
+
+    async def _lightcore_owner_app_can_run(self, interaction):
+        if getattr(interaction, "user", None) is not None and interaction.user.id in OWNER_IDS:
+            return True
+        return await _lightcore_original_app_can_run(self, interaction)
+
+    app_commands.Command._check_can_run = _lightcore_owner_app_can_run
+    app_commands.Command._lightcore_owner_bypass = True
 
 extensions: List[str] = [
     "cogs"
