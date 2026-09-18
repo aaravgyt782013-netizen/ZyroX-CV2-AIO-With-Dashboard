@@ -172,6 +172,13 @@ async def setup(bot: zyrox):
     await bot.add_cog(Prefix(bot))
     await bot.add_cog(Purge(bot))
     await bot.add_cog(Automod(bot))
+    # Automod event listeners (these enforce the configured rules).
+    await bot.add_cog(AntiSpam(bot))
+    await bot.add_cog(AntiCaps(bot))
+    await bot.add_cog(AntiLink(bot))
+    await bot.add_cog(AntiInvite(bot))
+    await bot.add_cog(AntiMassMention(bot))
+    await bot.add_cog(AntiEmojiSpam(bot))
     await bot.add_cog(Welcomer(bot))
     await bot.add_cog(Fun(bot))
     await bot.add_cog(Tracking(bot))
@@ -180,6 +187,10 @@ async def setup(bot: zyrox):
     await bot.add_cog(Voice(bot))
     await bot.add_cog(Owner(bot))
     await bot.add_cog(Customrole(bot))
+    # Autorole listener (assign configured roles when members join).
+    await bot.add_cog(Autorole2(bot))
+    # Role moderation command group.
+    await bot.add_cog(Role(bot))
     await bot.add_cog(afk(bot))
     await bot.add_cog(Embed(bot))
     await bot.add_cog(Media(bot))
