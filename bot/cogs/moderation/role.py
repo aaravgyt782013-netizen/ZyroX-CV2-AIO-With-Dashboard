@@ -57,7 +57,7 @@ class Role(commands.Cog):
     self.color = 0xFF0000
 
 
-  @commands.group(name="role",invoke_without_command=True)
+  @commands.group(name="role", aliases=["roles"], invoke_without_command=True)
   @blacklist_check()
   @ignore_check()
   @commands.cooldown(1, 5, commands.BucketType.user)
