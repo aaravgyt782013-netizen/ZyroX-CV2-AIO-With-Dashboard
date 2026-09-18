@@ -451,7 +451,11 @@ class TicketCog(commands.Cog, name="Ticket System"):
         ids = [x for x in (cat["notified_roles"] or "").split(",") if x.isdigit()]
         if str(role.id) not in ids: ids.append(str(role.id))
         self.db.execute("UPDATE ticket_categories SET notified_roles=? WHERE category_id=?", (",".join(ids), ticket["category_db_id"]))
-        await ctx.send(f"{SUCCESS_EMOJI} Added {role.mention} as a staff role for this ticket category.")
+        try:
+            await ctx.channel.set_permissions(role, view_channel=True, send_messages=True, read_message_history=True)
+        except discord.HTTPException:
+            pass
+        await ctx.send(f"{SUCCESS_EMOJI} Added {role.mention} as a staff role for this ticket category. They can now use Lock, Unlock, Claim and Close.")
 
     @staff.command(name="remove", description="Remove a staff role from the current ticket category.")
     async def staff_remove(self, ctx, role: discord.Role):
