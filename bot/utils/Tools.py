@@ -149,7 +149,7 @@ def top_check():
         topcheck_enabled = await is_topcheck_enabled(ctx.guild.id)
         if not topcheck_enabled:
             return True
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position <= ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position <= ctx.guild.me.top_role.position:
             embed = discord.Embed(
                 title=f"{DENIED} Access Denied",
                 description="Your top role must be at a **higher** position than my top role.",
