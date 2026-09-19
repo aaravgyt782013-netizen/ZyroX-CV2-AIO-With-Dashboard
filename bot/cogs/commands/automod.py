@@ -427,7 +427,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_channel(self, ctx, channel: discord.TextChannel):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
 
@@ -478,7 +478,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_role(self, ctx, role: discord.Role):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
 
@@ -531,7 +531,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_show(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
 
@@ -579,7 +579,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def ignore_reset(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
 
@@ -611,7 +611,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def unignore_channel(self, ctx, channel: discord.TextChannel):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
 
@@ -653,7 +653,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def unignore_role(self, ctx, role: discord.Role):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
 
@@ -696,7 +696,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def disable(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
             
@@ -749,7 +749,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def config(self, ctx):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
             
@@ -787,7 +787,7 @@ class Automod(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def logging(self, ctx, channel: discord.TextChannel):
         guild_id = ctx.guild.id
-        if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
+        if ctx.author.id not in OWNER_IDS and ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             await ctx.send(view=CV2(f"{CROSS} Access Denied", "Your top role must be at the **same** position or **higher** than my top role."))
             return
         if not await self.is_automod_enabled(guild_id):
