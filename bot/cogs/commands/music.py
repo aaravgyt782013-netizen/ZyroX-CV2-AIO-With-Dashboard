@@ -393,54 +393,82 @@ class Music(commands.Cog):
                 pass
 
     async def connect_nodes(self) -> None:
+        """Connect to healthy Lavalink v4 nodes.
+
+        The old Render environment pointed at n3.nexcloud.in:2026, which is
+        currently unreachable. Do not let one stale environment variable make
+        the whole music system unusable. We prefer the live public SSL list and
+        retain a small set of known v4 fallbacks.
+        """
+        configs = []
+
         primary_host = os.getenv("LAVALINK_HOST", "").strip()
         primary_password = os.getenv("LAVALINK_PASSWORD", "").strip()
         primary_secure = os.getenv("LAVALINK_SECURE", "true").strip().lower() == "true"
         primary_port = os.getenv("LAVALINK_PORT", "").strip()
 
-        configs = []
-        if primary_host and primary_password:
+        # Ignore the stale node seen in Render logs instead of retrying it forever.
+        if primary_host and primary_password and primary_host.lower() != "n3.nexcloud.in":
             configs.append((primary_host, primary_port, primary_password, primary_secure, "primary"))
 
-        # Keep public v4 fallbacks available so one unhealthy public node does
-        # not interrupt playback. These are only fallbacks; an environment
-        # configured private node remains the primary.
+        # Pull the current active SSL/v4 nodes from the public Lavalink list.
+        # The API is refreshed periodically and is preferable to hard-coding a
+        # node that may have gone offline.
+        try:
+            api_url = "https://lavalink-list.ajieblogs.eu.org/SSL"
+            timeout = aiohttp.ClientTimeout(total=8)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url) as response:
+                    if response.status == 200:
+                        live_nodes = await response.json()
+                        for item in live_nodes:
+                            host = str(item.get("host", "")).strip()
+                            port = str(item.get("port", "")).strip()
+                            password = str(item.get("password", ""))
+                            secure = bool(item.get("secure", True))
+                            version = str(item.get("version", "")).lower()
+                            identifier = str(item.get("identifier") or item.get("unique-id") or host)
+                            if host and password and (version in ("", "v4") or "v4" in version):
+                                configs.append((host, port, password, secure, f"live-{identifier}"))
+        except Exception as exc:
+            print(f"[LightCore Music] Live Lavalink list unavailable: {type(exc).__name__}: {exc}")
+
+        # Known v4 SSL fallbacks from the current public Lavalink list.
         configs.extend([
             ("lavalinkv4.serenetia.com", "443", "https://seretia.link/discord", True, "serenetia"),
-            ("lava-v4.millohost.my.id", "443", "https://discord.gg/mjS5J2K3ep", True, "millohost"),
             ("lavalink.jirayu.net", "443", "youshallnotpass", True, "jirayu"),
+            ("lava-v4.millohost.my.id", "443", "https://discord.gg/mjS5J2K3ep", True, "millohost"),
             ("lavalink-v4.triniumhost.com", "443", "free", True, "trinium"),
         ])
 
         nodes = []
         seen = set()
         for host, port, password, secure, identifier in configs:
-            key = (host, port, secure)
-            if key in seen:
+            key = (host.lower(), port, secure)
+            if not host or key in seen:
                 continue
             seen.add(key)
-            if secure:
-                uri = f"https://{host}:{port}" if port else f"https://{host}"
-            else:
-                uri = f"http://{host}:{port}" if port else f"http://{host}"
+            uri = f"{'https' if secure else 'http'}://{host}:{port}" if port else f"{'https' if secure else 'http'}://{host}"
             nodes.append(
                 wavelink.Node(
                     identifier=identifier,
                     uri=uri,
                     password=password,
-                    retries=None,
+                    retries=2,
                     resume_timeout=180,
                     inactive_player_timeout=None,
                 )
             )
 
         if not nodes:
-            raise RuntimeError("No Lavalink nodes are configured.")
+            print("[LightCore Music] No Lavalink v4 nodes are available.")
+            return
+
         try:
             await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
-            print(f"[LightCore Music] Connected to Lavalink pool with {len(nodes)} configured node(s).")
+            print(f"[LightCore Music] Lavalink pool initialized with {len(nodes)} node(s).")
         except Exception as exc:
-            print(f"[LightCore Music] Lavalink connection failed: {type(exc).__name__}: {exc}")
+            print(f"[LightCore Music] Lavalink pool connection failed: {type(exc).__name__}: {exc}")
 
     async def display_player_embed(self, player, track, ctx, autoplay=False):
         await ctx.send(view=MusicControlView(player, ctx, track, autoplay))
