@@ -59,11 +59,14 @@ class AutoRole(commands.Cog):
             await db.execute("""
             CREATE TABLE IF NOT EXISTS autorole (
                 guild_id INTEGER PRIMARY KEY,
-                bots TEXT NOT NULL,
-                humans TEXT NOT NULL
+                bots TEXT NOT NULL DEFAULT '[]',
+                humans TEXT NOT NULL DEFAULT '[]'
             )
             """)
             await db.commit()
+
+    async def ensure_table(self):
+        await self.create_table()
 
     @staticmethod
     def _parse_role_ids(value: str) -> List[int]:
@@ -80,6 +83,7 @@ class AutoRole(commands.Cog):
         return result
 
     async def get_autorole(self, guild_id: int) -> Dict[str, List[int]]:
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT bots, humans FROM autorole WHERE guild_id = ?", (guild_id,)) as cursor:
                 row = await cursor.fetchone()
