@@ -244,6 +244,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(Youtube(bot))
     await bot.add_cog(TempVoice(bot))
     await bot.add_cog(TempVoiceEventFix(bot))
+    await bot.add_cog(ServerControl(bot))
 
     await bot.add_cog(_antinuke(bot))
     await bot.add_cog(_extra(bot))
