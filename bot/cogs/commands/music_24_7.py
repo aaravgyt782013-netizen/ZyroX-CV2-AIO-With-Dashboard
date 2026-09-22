@@ -70,7 +70,6 @@ def _patch_music_class():
         except Exception:
             pass
 
-    Music.connect_nodes = connect_nodes
     Music.check_inactivity = check_inactivity
     Music.play_source = play_source
     Music.on_track_end = on_track_end
