@@ -78,7 +78,7 @@ class MinecraftView(ui.View):
         self.bot, self.server_type, self.ip, self.port, self.user_id = bot, server_type, ip, port, user_id
         self.last_refresh = None
 
-    @ui.button(label="Start", style=discord.ButtonStyle.success, custom_id="minecraft_start_button", emoji="▶️")
+    @ui.button(label="Start Server", style=discord.ButtonStyle.success, custom_id="minecraft_start_server_button_v2", emoji="▶️")
     async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Available to every member. The actual provider/API start action
         # will be connected once the server-start details are configured.
