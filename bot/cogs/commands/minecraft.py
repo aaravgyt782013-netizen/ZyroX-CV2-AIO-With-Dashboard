@@ -78,7 +78,18 @@ class MinecraftView(ui.View):
         self.bot, self.server_type, self.ip, self.port, self.user_id = bot, server_type, ip, port, user_id
         self.last_refresh = None
 
-    @ui.button(label="Refresh", style=discord.ButtonStyle.secondary, custom_id="refresh_button", emoji=EMOJI_REFRESH)
+    @ui.button(label="Start", style=discord.ButtonStyle.success, custom_id="minecraft_start_button", emoji="▶️")
+    async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Available to every member. The actual provider/API start action
+        # will be connected once the server-start details are configured.
+        await interaction.response.send_message(
+            f"{EMOJI_WARNING} **Server start is not configured yet.**\\n"
+            "This button is ready for members; the server-start provider "
+            "will be connected to it next.",
+            ephemeral=True,
+        )
+
+    @ui.button(label="Refresh", style=discord.ButtonStyle.secondary, custom_id="minecraft_refresh_button", emoji=EMOJI_REFRESH)
     async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message(f"{EMOJI_ERROR} You can't refresh this panel.", ephemeral=True)
