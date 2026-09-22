@@ -28,7 +28,7 @@ class ServerControl(commands.Cog):
         await asyncio.sleep(1)
         await self.bot.close()
 
-    @commands.command(name="shutdown", aliases=["stopbot"])
+    @commands.command(name="shutdown", aliases=["stopbot", "stop"])
     @commands.guild_only()
     async def shutdown(self, ctx: commands.Context):
         if not await self._owner_only(ctx):
