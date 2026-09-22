@@ -32,11 +32,10 @@ def _patch_music_class():
             except Exception:
                 configs = []
         if not configs:
+            # Keep one known-connected fallback by default. Public Lavalink nodes can
+            # disappear or change their YouTube configuration without notice.
             configs = [
-                {"host": "lavalinkv4.serenetia.com", "port": 443, "password": "https://seretia.link/discord", "secure": True},
                 {"host": "lava-v4.millohost.my.id", "port": 443, "password": "https://discord.gg/mjS5J2K3ep", "secure": True},
-                {"host": "lavalink.triniumhost.com", "port": 4333, "password": "free", "secure": False},
-                {"host": "n3.nexcloud.in", "port": 2026, "password": "nexcloud", "secure": False},
             ]
         nodes = []
         for index, item in enumerate(configs):
