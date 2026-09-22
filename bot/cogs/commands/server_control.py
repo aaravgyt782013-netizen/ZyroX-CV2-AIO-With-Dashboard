@@ -17,7 +17,7 @@ class ServerControl(commands.Cog):
             return False
         return True
 
-    @commands.command(name="restart", help="Restart the bot service (owner only).")
+    @commands.command(name="botrestart", help="Restart the LightCore bot service (owner only).")
     @commands.guild_only()
     async def restart(self, ctx):
         if not await self._owner_only(ctx):
@@ -28,7 +28,7 @@ class ServerControl(commands.Cog):
         await self.bot.close()
         os._exit(0)
 
-    @commands.command(name="stop", help="Stop the bot process (owner only).")
+    @commands.command(name="botstop", help="Stop the LightCore bot process (owner only).")
     @commands.guild_only()
     async def stop(self, ctx):
         if not await self._owner_only(ctx):
