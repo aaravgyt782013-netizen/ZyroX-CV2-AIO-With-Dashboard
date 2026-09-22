@@ -263,32 +263,136 @@ class Minecraft(commands.Cog):
                     except discord.NotFound: await self.delete_status_message(row[0])
                     except Exception as e: print(f"Auto-refresh error for guild {row[0]}: {e}")
 
-    minecraft = app_commands.Group(name="minecraft", description="Commands for Minecraft server status.")
+    minecraft = app_commands.Group(
+        name="minecraft",
+        description="Minecraft server status and monitoring."
+    )
 
-    @minecraft.command(name="setup", description="Set up the auto-updating Minecraft server status.")
+    @minecraft.command(name="setup", description="Set up a Java or Bedrock Minecraft server.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_slash(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(DB_PATH) as db:
-            if await (await db.execute("SELECT 1 FROM mc_status_messages WHERE guild_id = ?", (interaction.guild.id,))).fetchone():
-                return await interaction.response.send_message(f"{EMOJI_WARNING} Setup already exists. Use `/minecraft reset`.", ephemeral=True)
         await interaction.response.send_modal(SetupModal(self))
+
+    @minecraft.command(name="status", description="Show the configured Minecraft server status.")
+    async def status_slash(self, interaction: discord.Interaction):
+        row = await self.get_latest_server(interaction.guild.id)
+        if not row:
+            return await interaction.response.send_message(
+                f"{EMOJI_WARNING} No server configured. Use /minecraft setup.",
+                ephemeral=True
+            )
+        await interaction.response.defer()
+        embed, file, view = await self.generate_response(
+            interaction.guild, row[0], row[1], row[2], row[3]
+        )
+        await interaction.followup.send(embed=embed, file=file, view=view)
+
+    @minecraft.command(name="players", description="Show players currently online.")
+    async def players_slash(self, interaction: discord.Interaction):
+        row = await self.get_latest_server(interaction.guild.id)
+        if not row:
+            return await interaction.response.send_message(
+                f"{EMOJI_WARNING} No server configured. Use /minecraft setup.",
+                ephemeral=True
+            )
+        await interaction.response.defer()
+        _, status, _ = await self.auto_detect_server(row[1], row[2])
+        if not status.get("online"):
+            return await interaction.followup.send(
+                f"{EMOJI_STATUS_OFFLINE} The configured server is offline."
+            )
+        sample = status.get("players_sample") or []
+        names = [getattr(player, "name", None) for player in sample if getattr(player, "name", None)]
+        if names:
+            listing = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(names[:50]))
+        else:
+            listing = "The server is online, but the player list is hidden or unavailable."
+        await interaction.followup.send(
+            f"{EMOJI_PLAYERS} **{status.get('players_online', 0)}/{status.get('players_max', 0)} online**\n{listing}"
+        )
+
+    @minecraft.command(name="ip", description="Show the configured host, port and numeric IP.")
+    async def ip_slash(self, interaction: discord.Interaction):
+        row = await self.get_latest_server(interaction.guild.id)
+        if not row:
+            return await interaction.response.send_message(
+                f"{EMOJI_WARNING} No server configured. Use /minecraft setup.",
+                ephemeral=True
+            )
+        try:
+            numeric_ip = await asyncio.to_thread(socket.gethostbyname, row[1])
+        except Exception:
+            numeric_ip = "Unavailable"
+        await interaction.response.send_message(
+            f"🌐 **Host:** {row[1]}:{row[2]}\n"
+            f"🔢 **Numeric IP:** {numeric_ip}\n"
+            f"🧩 **Type:** {row[0].capitalize()}"
+        )
+
+    @minecraft.command(name="monitor", description="Create an auto-updating server status panel.")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def monitor_slash(self, interaction: discord.Interaction):
+        row = await self.get_latest_server(interaction.guild.id)
+        if not row:
+            return await interaction.response.send_message(
+                f"{EMOJI_WARNING} Configure a server first with /minecraft setup.",
+                ephemeral=True
+            )
+        await interaction.response.defer(ephemeral=True)
+        embed, file, view = await self.generate_response(
+            interaction.guild, row[0], row[1], row[2], row[3]
+        )
+        message = await interaction.channel.send(embed=embed, file=file, view=view)
+        await self.save_status_message(
+            interaction.guild.id, interaction.user.id,
+            interaction.channel.id, message.id, row[0], row[1], row[2]
+        )
+        await interaction.followup.send(
+            f"{EMOJI_SUCCESS} Monitor created and will refresh every 2 minutes.",
+            ephemeral=True
+        )
+
+    @minecraft.command(name="unmonitor", description="Remove the current server status panel.")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def unmonitor_slash(self, interaction: discord.Interaction):
+        removed = await self.delete_status_message(interaction.guild.id)
+        await interaction.response.send_message(
+            f"{EMOJI_SUCCESS} Minecraft monitor removed." if removed
+            else f"{EMOJI_WARNING} No active Minecraft monitor found.",
+            ephemeral=True
+        )
+
+    @minecraft.command(name="monitors", description="Show the configured Minecraft server monitor.")
+    async def monitors_slash(self, interaction: discord.Interaction):
+        row = await self.get_latest_server(interaction.guild.id)
+        if not row:
+            return await interaction.response.send_message(
+                f"{EMOJI_WARNING} No Minecraft server is configured.",
+                ephemeral=True
+            )
+        embed = discord.Embed(
+            title="🖥️ Minecraft Server Configuration",
+            color=discord.Color.blurple()
+        )
+        embed.add_field(name="Address", value=f"{row[1]}:{row[2]}", inline=False)
+        embed.add_field(name="Type", value=row[0].capitalize(), inline=True)
+        embed.add_field(
+            name="Monitor",
+            value="🟢 Active" if row[3] else "⚪ Not active",
+            inline=True
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @minecraft.command(name="reset", description="Remove the Minecraft server status setup.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def reset_slash(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         removed = await self.delete_status_message(interaction.guild.id)
-        await interaction.followup.send(f"{EMOJI_SUCCESS} Minecraft status panel removed." if removed else f"{EMOJI_WARNING} No setup found.", ephemeral=True)
-            
-    @minecraft.command(name="status", description="Get a one-time status of the configured server.")
-    async def status_slash(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=False)
-        async with aiosqlite.connect(DB_PATH) as db:
-            row = await (await db.execute("SELECT server_type, server_ip, server_port, user_id FROM mc_status_messages WHERE guild_id = ?", (interaction.guild.id,))).fetchone()
-        if not row:
-            return await interaction.followup.send(f"{EMOJI_WARNING} No server configured. Use `/minecraft setup`.", ephemeral=True)
-        embed, file, _ = await self.generate_response(interaction.guild, row[0], row[1], row[2], row[3])
-        await interaction.followup.send(embed=embed, file=file, ephemeral=False)
+        await interaction.followup.send(
+            f"{EMOJI_SUCCESS} Minecraft status panel removed." if removed
+            else f"{EMOJI_WARNING} No setup found.",
+            ephemeral=True
+        )
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Minecraft(bot))
