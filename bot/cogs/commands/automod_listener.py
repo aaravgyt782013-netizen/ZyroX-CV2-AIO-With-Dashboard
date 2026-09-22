@@ -40,8 +40,18 @@ class AutomodListener(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._spam_windows: dict[tuple[int, int], deque[float]] = defaultdict(deque)
+        self.bot.loop.create_task(self._ensure_db())
+
+    async def _ensure_db(self):
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            await db.execute("CREATE TABLE IF NOT EXISTS automod (guild_id INTEGER PRIMARY KEY, enabled INTEGER DEFAULT 0)")
+            await db.execute("CREATE TABLE IF NOT EXISTS automod_punishments (guild_id INTEGER, event TEXT, punishment TEXT, PRIMARY KEY (guild_id, event))")
+            await db.execute("CREATE TABLE IF NOT EXISTS automod_ignored (guild_id INTEGER, type TEXT, id INTEGER, PRIMARY KEY (guild_id, type, id))")
+            await db.execute("CREATE TABLE IF NOT EXISTS automod_logging (guild_id INTEGER, log_channel INTEGER, PRIMARY KEY (guild_id))")
+            await db.commit()
 
     async def _enabled_rules(self, guild_id: int) -> set[str]:
+        await self._ensure_db()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute(
                 "SELECT event FROM automod_punishments WHERE guild_id = ?",
@@ -53,6 +63,7 @@ class AutomodListener(commands.Cog):
         if not message.guild:
             return True
 
+        await self._ensure_db()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute(
                 "SELECT 1 FROM automod_ignored WHERE guild_id = ? AND type = 'channel' AND id = ?",
@@ -74,6 +85,7 @@ class AutomodListener(commands.Cog):
         return False
 
     async def _punishment(self, guild_id: int, event: str) -> str:
+        await self._ensure_db()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute(
                 "SELECT punishment FROM automod_punishments WHERE guild_id = ? AND event = ?",
@@ -83,6 +95,7 @@ class AutomodListener(commands.Cog):
                 return row[0] if row and row[0] else "Mute"
 
     async def _log(self, guild: discord.Guild, message: discord.Message, event: str, punishment: str) -> None:
+        await self._ensure_db()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute(
                 "SELECT log_channel FROM automod_logging WHERE guild_id = ?",
@@ -122,6 +135,8 @@ class AutomodListener(commands.Cog):
 
         try:
             if punishment == "Mute":
+                if not guild.me or not guild.me.guild_permissions.moderate_members:
+                    return
                 minutes = PUNISHMENT_TIMEOUTS.get(event, 1)
                 await member.timeout(
                     timedelta(minutes=minutes),
