@@ -51,7 +51,7 @@ from .commands.stats import Stats
 from .commands.emergency import Emergency
 from .commands.notify import NotifCommands
 from .commands.status import Status
-from .commands.servercontrol import ServerControl
+from .commands.server_control import ServerControl
 from .commands.np import NoPrefix
 from .commands.filters import FilterCog
 from .commands.owner2 import Global
