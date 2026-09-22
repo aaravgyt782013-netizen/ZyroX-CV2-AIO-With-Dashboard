@@ -51,6 +51,7 @@ from .commands.stats import Stats
 from .commands.emergency import Emergency
 from .commands.notify import NotifCommands
 from .commands.status import Status
+from .commands.servercontrol import ServerControl
 from .commands.np import NoPrefix
 from .commands.filters import FilterCog
 from .commands.owner2 import Global
@@ -216,6 +217,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(Stats(bot))
     await bot.add_cog(Emergency(bot))
     await bot.add_cog(Status(bot))
+    await bot.add_cog(ServerControl(bot))
     await bot.add_cog(NoPrefix(bot))
     await bot.add_cog(FilterCog(bot))
     await bot.add_cog(Global(bot))
