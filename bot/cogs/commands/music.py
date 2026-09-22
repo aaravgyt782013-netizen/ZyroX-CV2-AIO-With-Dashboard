@@ -428,7 +428,7 @@ class Music(commands.Cog):
                             secure = bool(item.get("secure", True))
                             version = str(item.get("version", "")).lower()
                             identifier = str(item.get("identifier") or item.get("unique-id") or host)
-                            if host and password and (version in ("", "v4") or "v4" in version):
+                            if host and password and host.lower() != "n3.nexcloud.in" and (version in ("", "v4") or "v4" in version):
                                 configs.append((host, port, password, secure, f"live-{identifier}"))
         except Exception as exc:
             print(f"[LightCore Music] Live Lavalink list unavailable: {type(exc).__name__}: {exc}")
