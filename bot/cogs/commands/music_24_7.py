@@ -21,42 +21,8 @@ def _normalize_youtube_url(query: str) -> str:
 def _patch_music_class():
     from .music import Music
 
-    async def connect_nodes(self) -> None:
-        raw = os.getenv("LAVALINK_NODES", "").strip()
-        configs = []
-        if raw:
-            try:
-                parsed = json.loads(raw)
-                if isinstance(parsed, list):
-                    configs = parsed
-            except Exception:
-                configs = []
-        if not configs:
-            # Keep one known-connected fallback by default. Public Lavalink nodes can
-            # disappear or change their YouTube configuration without notice.
-            configs = [
-                {"host": "lava-v4.millohost.my.id", "port": 443, "password": "https://discord.gg/mjS5J2K3ep", "secure": True},
-            ]
-        nodes = []
-        for index, item in enumerate(configs):
-            try:
-                host = str(item["host"]).strip()
-                port = int(item.get("port", 443))
-                password = str(item["password"])
-                secure = bool(item.get("secure", port == 443))
-                uri = f"https://{host}:{port}" if secure else f"http://{host}:{port}"
-                nodes.append(wavelink.Node(identifier=f"lightcore-{index + 1}", uri=uri, password=password, retries=None, resume_timeout=180, inactive_player_timeout=None))
-            except Exception as exc:
-                print(f"[LightCore Music] Invalid Lavalink node config: {exc}")
-        if not nodes:
-            print("[LightCore Music] No Lavalink nodes configured.")
-            return
-        try:
-            await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
-            print(f"[LightCore Music] Lavalink pool started with {len(nodes)} nodes.")
-        except Exception as exc:
-            print(f"[LightCore Music] Lavalink pool connection error: {exc}")
-
+    # Keep Music.connect_nodes from music.py. It discovers the current
+    # healthy Lavalink list and ignores stale nodes; do not override it here.
     async def check_inactivity(self, guild_id):
         return
 
