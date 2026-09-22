@@ -1,6 +1,0 @@
-LightCore repository backup marker.
-
-Backup commit: 44858ffa9060b1f402915281120c6df59febc92a
-Backup date: 2026-09-22
-
-This marker is created on the backup branch only.
