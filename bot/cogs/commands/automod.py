@@ -113,9 +113,11 @@ class Automod(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.default_punishment = "Mute"
+        self._db_ready = asyncio.Event()
         self.bot.loop.create_task(self.init_db())
 
     async def get_exempt_roles_channels(self, guild_id):
+        await self._db_ready.wait()
         async with aiosqlite.connect("db/automod.db") as db:
             roles_cursor = await db.execute("SELECT id FROM automod_ignored WHERE guild_id = ? AND type = 'role'", (guild_id,))
             channels_cursor = await db.execute("SELECT id FROM automod_ignored WHERE guild_id = ? AND type = 'channel'", (guild_id,))
@@ -127,17 +129,20 @@ class Automod(commands.Cog):
             
 
     async def is_automod_enabled(self, guild_id):
+        await self._db_ready.wait()
         async with aiosqlite.connect("db/automod.db") as db:
             cursor = await db.execute("SELECT enabled FROM automod WHERE guild_id = ?", (guild_id,))
             result = await cursor.fetchone()
             return result is not None and result[0] == 1
 
     async def update_punishments(self, guild_id, event, punishment):
+        await self._db_ready.wait()
         async with aiosqlite.connect("db/automod.db") as db:
             await db.execute("INSERT OR REPLACE INTO automod_punishments (guild_id, event, punishment) VALUES (?, ?, ?)", (guild_id, event, punishment))
             await db.commit()
 
     async def get_current_punishments(self, guild_id):
+        await self._db_ready.wait()
         async with aiosqlite.connect("db/automod.db") as db:
             async with db.execute(
                 "SELECT event, punishment FROM automod_punishments WHERE guild_id = ? AND event != 'Anti NSFW link'", 
@@ -146,6 +151,7 @@ class Automod(commands.Cog):
                 return await cursor.fetchall()
 
     async def is_anti_nsfw_enabled(self, guild_id):
+        await self._db_ready.wait()
         async with aiosqlite.connect("db/automod.db") as db:
             cursor = await db.execute("SELECT punishment FROM automod_punishments WHERE guild_id = ? AND event = 'Anti NSFW link'", (guild_id,))
             result = await cursor.fetchone()
@@ -185,6 +191,7 @@ class Automod(commands.Cog):
                 )
             """)
             await db.commit()
+        self._db_ready.set()
 
     @commands.hybrid_group(invoke_without_command=True)
     @blacklist_check()
