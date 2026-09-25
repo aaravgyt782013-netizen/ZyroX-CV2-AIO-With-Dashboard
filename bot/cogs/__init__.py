@@ -194,6 +194,9 @@ async def setup(bot: zyrox):
     # Autorole command + listener (configure and assign roles when members join).
     await bot.add_cog(AutoRole(bot))
     await bot.add_cog(Autorole2(bot))
+    # Register the guild-join listener separately.  This cog is responsible
+    # for the join event used by the autorole system's runtime integration.
+    await bot.add_cog(Autorole(bot))
     # Role moderation command group.
     await bot.add_cog(Role(bot))
     await bot.add_cog(afk(bot))
