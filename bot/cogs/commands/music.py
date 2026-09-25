@@ -409,9 +409,16 @@ class Music(commands.Cog):
         if primary_host and primary_password and primary_host.lower() != "n3.nexcloud.in":
             configs.append((primary_host, primary_port, primary_password, primary_secure, "lightcore-primary"))
 
+        # Current public v4 fallbacks. The previous SSL nodes were returning
+        # repeated 403 websocket responses in Render, leaving the pool at 0/2.
+        # Keep the env-configured node first, then use several independent
+        # public nodes so one provider outage does not disable music entirely.
         configs.extend([
-            ("lavalinkv4.serenetia.com", "443", "https://seretia.link/discord", True, "lightcore-serenetia"),
-            ("lava-v4.millohost.my.id", "443", "https://discord.gg/mjS5J2K3ep", True, "lightcore-millohost"),
+            ("lavalink.jirayu.net", "13592", "youshallnotpass", False, "lightcore-jirayu"),
+            ("n3.nexcloud.in", "2026", "nexcloud", False, "lightcore-nexcloud"),
+            ("omega.vexanode.cloud", "2031", "https://discord.vexanode.cloud", False, "lightcore-vexanode"),
+            ("lava2.kasawa.pro", "2334", "youshallnotpass", False, "lightcore-kasawa"),
+            ("lavav4.minecuta.com", "2333", "discord.gg/gKuXdHs", False, "lightcore-minecuta"),
         ])
 
         nodes = []
