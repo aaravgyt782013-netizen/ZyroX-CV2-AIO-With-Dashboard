@@ -101,8 +101,16 @@ async def on_ready():
     print(f"Connected to: {len(client.guilds)} guilds")
     print(f"Connected to: {len(client.users)} users")
 
-    # Sync application emojis on startup
-    await run_sync(TOKEN)
+    # on_ready can fire again after reconnect. Only do the expensive
+    # REST synchronization and background-task creation once per process.
+    if _ready_tasks_started:
+        return
+    _ready_tasks_started = True
+
+    try:
+        await run_sync(TOKEN)
+    except Exception as e:
+        print(f"Emoji sync skipped: {e}")
 
     async def sync_commands():
         try:
@@ -344,20 +352,39 @@ async def main():
         os.system("clear")
         await client.load_extension("jishaku")
         
-        max_retries = 5
+        # Respect Discord's gateway/login rate limit. Rapid retries create
+        # an identify retry storm and can keep the bot offline.
+        max_retries = 3
         for attempt in range(max_retries):
             try:
                 await client.start(TOKEN)
-                break
+                return
             except discord.HTTPException as e:
-                if e.status == 429: # Rate limited
-                    wait_time = min((2 ** attempt) + random.random(), 60)
-                    print(f"Rate limited. Retrying in {wait_time:.2f} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
+                if e.status != 429:
                     raise
-        else:
-            raise Exception("Bot failed to start after multiple retries due to rate limiting.")
+
+                retry_after = getattr(e, "retry_after", None)
+                if retry_after is None:
+                    retry_after = min(120 * (2 ** attempt), 300)
+                else:
+                    retry_after = max(float(retry_after), 60.0)
+                    retry_after = min(retry_after, 300.0)
+
+                if attempt == max_retries - 1:
+                    print(
+                        f"Discord returned HTTP 429 after {max_retries} login attempts. "
+                        f"Waiting {retry_after:.1f}s before giving up."
+                    )
+                    await asyncio.sleep(retry_after)
+                    break
+
+                print(
+                    f"Discord gateway/login rate-limited (429). "
+                    f"Waiting {retry_after:.1f}s before retry {attempt + 2}/{max_retries}..."
+                )
+                await asyncio.sleep(retry_after)
+
+        raise Exception("Bot could not start because Discord kept the gateway/login rate-limited.")
 
 if __name__ == "__main__":
     asyncio.run(main())
