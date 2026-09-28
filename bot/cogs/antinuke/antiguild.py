@@ -13,6 +13,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 import discord
+from utils.antinuke_policy import apply_punishment
 from discord.ext import commands
 import aiosqlite
 import asyncio
@@ -141,7 +142,7 @@ class AntiGuildUpdate(commands.Cog):
         retries = 3
         while retries > 0:
             try:
-                await guild.ban(executor, reason="Guild Update | Unwhitelisted User")
+                await apply_punishment(guild, executor, "guild_update", "Guild Update | Unwhitelisted User")
                 return
             except discord.Forbidden:
                 return
