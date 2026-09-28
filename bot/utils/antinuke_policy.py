@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 import aiosqlite
 import discord
 
@@ -46,7 +47,7 @@ async def apply_punishment(guild: discord.Guild, member: discord.Member, event: 
             await guild.kick(member, reason=reason)
         elif action == "timeout":
             await member.edit(
-                timed_out_until=discord.utils.utcnow() + discord.utils.timedelta(hours=1),
+                timed_out_until=discord.utils.utcnow() + timedelta(hours=1),
                 reason=reason,
             )
         else:
