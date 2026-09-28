@@ -393,31 +393,27 @@ class Music(commands.Cog):
                 pass
 
     async def connect_nodes(self) -> None:
-        """Initialize Lavalink with LightCore's configured node and stable v4 fallbacks.
+        """Connect Wavelink to working Lavalink v4 nodes.
 
-        Do not use the rotating public-node feed here: the Render logs showed
-        stale/invalid entries returning 403 or 404 responses, which left the
-        music system without a usable node.
+        The previous pool contained several stale/unreachable public nodes.
+        Keep an optional Render env node first, then use the current public
+        list as fallbacks. A failed node no longer prevents the other nodes
+        from connecting.
         """
         configs = []
 
         primary_host = os.getenv("LAVALINK_HOST", "").strip()
         primary_password = os.getenv("LAVALINK_PASSWORD", "").strip()
-        primary_secure = os.getenv("LAVALINK_SECURE", "true").strip().lower() == "true"
+        primary_secure = os.getenv("LAVALINK_SECURE", "false").strip().lower() == "true"
         primary_port = os.getenv("LAVALINK_PORT", "").strip()
 
-        if primary_host and primary_password and primary_host.lower() != "n3.nexcloud.in":
+        if primary_host and primary_password:
             configs.append((primary_host, primary_port, primary_password, primary_secure, "lightcore-primary"))
 
-        # Current public v4 fallbacks. The previous SSL nodes were returning
-        # repeated 403 websocket responses in Render, leaving the pool at 0/2.
-        # Keep the env-configured node first, then use several independent
-        # public nodes so one provider outage does not disable music entirely.
         configs.extend([
             ("lavalink.jirayu.net", "13592", "youshallnotpass", False, "lightcore-jirayu"),
-            ("n3.nexcloud.in", "2026", "nexcloud", False, "lightcore-nexcloud"),
-            ("omega.vexanode.cloud", "2031", "https://discord.vexanode.cloud", False, "lightcore-vexanode"),
-            ("lava2.kasawa.pro", "2334", "youshallnotpass", False, "lightcore-kasawa"),
+            ("lavalinkv4.serenetia.com", "80", "https://seretia.link/discord", False, "lightcore-serenetia"),
+            ("lava.g3v.co.uk", "9008", "lavalinklol", False, "lightcore-g3v"),
             ("lavav4.minecuta.com", "2333", "discord.gg/gKuXdHs", False, "lightcore-minecuta"),
         ])
 
@@ -428,15 +424,13 @@ class Music(commands.Cog):
             if not host or not password or key in seen:
                 continue
             seen.add(key)
-            uri = (
-                f"{'https' if secure else 'http'}://{host}:{port}"
-                if port else f"{'https' if secure else 'http'}://{host}"
-            )
+            scheme = "https" if secure else "http"
+            uri = f"{scheme}://{host}:{port}" if port else f"{scheme}://{host}"
             nodes.append(wavelink.Node(
                 identifier=identifier,
                 uri=uri,
                 password=password,
-                retries=3,
+                retries=None,
                 resume_timeout=180,
                 inactive_player_timeout=None,
             ))
@@ -446,14 +440,12 @@ class Music(commands.Cog):
             return
 
         try:
-            connected = await wavelink.Pool.connect(
+            await wavelink.Pool.connect(
                 nodes=nodes,
                 client=self.client,
                 cache_capacity=None,
             )
-            ready = [identifier for identifier, node in connected.items()
-                     if getattr(node, "status", None) == wavelink.NodeStatus.CONNECTED]
-            print(f"[LightCore Music] Lavalink ready: {len(ready)}/{len(nodes)} node(s) connected.")
+            print(f"[LightCore Music] Lavalink pool started with {len(nodes)} node(s).")
         except Exception as exc:
             print(f"[LightCore Music] Lavalink pool connection failed: {type(exc).__name__}: {exc}")
 
