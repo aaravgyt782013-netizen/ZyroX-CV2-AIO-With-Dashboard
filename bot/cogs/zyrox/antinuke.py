@@ -1,15 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║                                                                  ║
-# ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
-# ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
-# ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
-# ║                                                                  ║
+# ║                         LIGHTCORE                                ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
 import discord
@@ -22,14 +12,14 @@ class _antinuke(commands.Cog):
         self.bot = bot
 
     """Antinuke commands"""
-  
+
     def help_custom(self):
-		      emoji = ZSAFE
-		      label = "Security Commands"
-		      description = "Show you Commands of Antinuke"
-		      return emoji, label, description
+        emoji = ZSAFE
+        label = "Antinuke"
+        description = "Show you commands for Antinuke and server security"
+        return emoji, label, description
 
     @commands.group()
     async def __Antinuke__(self, ctx: commands.Context):
-        """`antinuke` , `antinuke enable` , `antinuke disable` , `whitelist` , `whitelist @user` , `unwhitelist` , `whitelisted` , `whitelist reset` , `extraowner` , `extraowner set` , `extraowner view` , `extraowner reset`, `nightmode` , `nightmode enable` , `nightmode disable`\n"""
-
+        """Antinuke security commands."""
+        pass
