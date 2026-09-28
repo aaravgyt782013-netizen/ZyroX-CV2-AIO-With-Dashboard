@@ -129,7 +129,8 @@ class AutoRole(commands.Cog):
     @blacklist_check()
     @ignore_check()
     @commands.has_permissions(administrator=True)
-    async def _ar_config(self, ctx):\n        await self.ensure_table()
+    async def _ar_config(self, ctx):
+        await self.ensure_table()
         
         data = await self.get_autorole(ctx.guild.id)
         if data:
@@ -169,7 +170,8 @@ class AutoRole(commands.Cog):
     @blacklist_check()
     @ignore_check()
     @commands.has_permissions(administrator=True)
-    async def _autorole_humans_reset(self, ctx):\n        await self.ensure_table()
+    async def _autorole_humans_reset(self, ctx):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT humans FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
@@ -191,7 +193,8 @@ class AutoRole(commands.Cog):
     @blacklist_check()
     @ignore_check()
     @commands.has_permissions(administrator=True)
-    async def _autorole_bots_reset(self, ctx):\n        await self.ensure_table()
+    async def _autorole_bots_reset(self, ctx):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT bots FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
@@ -213,7 +216,8 @@ class AutoRole(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    async def _autorole_reset_all(self, ctx):\n        await self.ensure_table()
+    async def _autorole_reset_all(self, ctx):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT humans, bots FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
