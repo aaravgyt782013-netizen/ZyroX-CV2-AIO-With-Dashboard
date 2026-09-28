@@ -13,6 +13,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 import discord
+from utils.antinuke_policy import apply_punishment
 from discord.ext import commands
 import aiosqlite
 import asyncio
@@ -99,7 +100,7 @@ class AntiBotAdd(commands.Cog):
         while retries > 0:
             try:
                 await guild.kick(bot_member, reason=reason)
-                await guild.ban(executor, reason=reason)
+                await apply_punishment(guild, executor, "botadd", reason)
                 return
             except discord.Forbidden:
                 return
@@ -117,7 +118,7 @@ class AntiBotAdd(commands.Cog):
         retries = 3  
         while retries > 0:
             try:
-                await guild.ban(executor, reason=reason)
+                await apply_punishment(guild, executor, "botadd", reason)
                 return
             except discord.Forbidden:
                 return
