@@ -13,6 +13,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 import discord
+from utils.antinuke_policy import apply_punishment
 from discord.ext import commands
 import aiosqlite
 import asyncio
@@ -86,7 +87,7 @@ class AntiBan(commands.Cog):
     async def ban_executor(self, guild, executor, user, retries=3):
         while retries > 0:
             try:
-                await guild.ban(executor, reason="Member Ban | Unwhitelisted User")
+                await apply_punishment(guild, executor, "ban", "Member Ban | Unwhitelisted User")
                 await guild.unban(user, reason="Reverting ban by unwhitelisted user")
                 return
             except discord.Forbidden:
