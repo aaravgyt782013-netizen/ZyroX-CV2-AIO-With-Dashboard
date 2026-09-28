@@ -101,7 +101,7 @@ class Antinuke(commands.Cog):
   @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
   @commands.guild_only()
   @commands.has_permissions(administrator=True)
-  async def antinuke(self, ctx, option: str = None):
+  async def antinuke(self, ctx, option: str = None, action: str = None, punishment: str = None):
     guild_id = ctx.guild.id
     pre=ctx.prefix
 
