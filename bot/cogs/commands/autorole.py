@@ -251,7 +251,8 @@ class AutoRole(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(manage_roles=True)
-    async def _autorole_humans_add(self, ctx, *, role: discord.Role):\n        await self.ensure_table()
+    async def _autorole_humans_add(self, ctx, *, role: discord.Role):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT humans FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
@@ -284,7 +285,8 @@ class AutoRole(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    async def _autorole_humans_remove(self, ctx, *, role: discord.Role):\n        await self.ensure_table()
+    async def _autorole_humans_remove(self, ctx, *, role: discord.Role):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT humans FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
@@ -323,7 +325,8 @@ class AutoRole(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(manage_roles=True)
-    async def _autorole_bots_add(self, ctx, *, role: discord.Role):\n        await self.ensure_table()
+    async def _autorole_bots_add(self, ctx, *, role: discord.Role):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT bots FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
@@ -356,7 +359,8 @@ class AutoRole(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
-    async def _autorole_bots_remove(self, ctx, *, role: discord.Role):\n        await self.ensure_table()
+    async def _autorole_bots_remove(self, ctx, *, role: discord.Role):
+        await self.ensure_table()
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT bots FROM autorole WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 data = await cursor.fetchone()
