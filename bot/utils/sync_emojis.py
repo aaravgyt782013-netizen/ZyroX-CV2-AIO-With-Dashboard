@@ -1,83 +1,132 @@
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║                                                                  ║
-# ║   ░█▀▀░█▀█░█▀▄░█▀▀░█░█   ░█▀▄░█▀▀░█░█░█▀▀                     ║
-# ║   ░█░░░█░█░█░█░█▀▀░▄▀▄   ░█░█░█▀▀░▀▄▀░▀▀█                     ║
-# ║   ░▀▀▀░▀▀▀░▀▀░░▀▀▀░▀░▀   ░▀▀░░▀▀▀░░▀░░▀▀▀                     ║
-# ║                                                                  ║
-# ║            © 2026 CodeX Devs — All Rights Reserved              ║
-# ║                                                                  ║
-# ║   discord  ──  https://discord.gg/codexdev                      ║
-# ║   youtube  ──  https://youtube.com/@CodeXDevs                   ║
-# ║   github   ──  https://github.com/RayExo                        ║
-# ║                                                                  ║
+# ║                         LIGHTCORE                                ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-"""
-Application Emoji Sync Utility
-Reads all custom Discord emojis from utils/emoji.py, checks them against
-the bot's application emojis, uploads any that are missing, and patches
-emoji.py in-place with corrected IDs.
+"""Reliable application-emoji synchronizer for LightCore.
 
-Controlled by EMOJI_SYNC in .env:
-  EMOJI_SYNC="true"   → runs on every startup
-  EMOJI_SYNC="false"  → skipped entirely
+The source of truth is utils/emoji.py. Discord application emojis are
+synchronized at startup and missing/stale IDs are repaired automatically.
 
-If emoji.py is patched (new uploads or ID fixes), the bot automatically
-restarts so the fresh IDs are loaded into memory.
-
-Call `run_sync(token)` once inside on_ready.
+Note: Discord does not provide global/application stickers. Stickers are
+guild assets and must be created in each guild separately.
 """
 
+from __future__ import annotations
+
+import asyncio
+import base64
 import os
 import re
 import sys
-import base64
-import asyncio
+
 import aiohttp
 from colorama import Fore, Style, init
 
 init(autoreset=True)
 
 EMOJI_PY_PATH = os.path.join(os.path.dirname(__file__), "emoji.py")
+API_BASE = "https://discord.com/api/v10"
 
 
 def _log(level: str, color: str, symbol: str, msg: str) -> None:
     print(f"{color}{symbol} {level}:{Style.RESET_ALL} {msg}")
 
-def info(msg):    _log("EmojiSync", Fore.CYAN,    "◈", msg)
-def success(msg): _log("EmojiSync", Fore.GREEN,   "✔", msg)
-def warning(msg): _log("EmojiSync", Fore.YELLOW,  "↻", msg)
-def error(msg):   _log("EmojiSync", Fore.RED,     "✖", msg)
-def system(msg):  _log("EmojiSync", Fore.MAGENTA, "★", msg)
+
+def info(msg): _log("EmojiSync", Fore.CYAN, "◈", msg)
+def success(msg): _log("EmojiSync", Fore.GREEN, "✔", msg)
+def warning(msg): _log("EmojiSync", Fore.YELLOW, "↻", msg)
+def error(msg): _log("EmojiSync", Fore.RED, "✖", msg)
+def system(msg): _log("EmojiSync", Fore.MAGENTA, "★", msg)
 
 
 def _restart() -> None:
-    """Replace the current process with a fresh copy of itself."""
-    system(f"Restarting bot to load updated emoji IDs...")
-    # Flush stdout so the message is visible before the process is replaced
+    system("Restarting bot to load updated emoji IDs...")
     sys.stdout.flush()
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
-async def _fetch_emoji_image(session: aiohttp.ClientSession, emoji_id: str, animated: bool):
-    ext = "gif" if animated else "webp"
-    url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
-    try:
-        async with session.get(url, allow_redirects=True) as r:
-            if r.status == 200:
-                return await r.read()
-    except Exception:
-        pass
-    return None
+async def _request_json(session, method, url, *, retries=4, **kwargs):
+    """Request JSON while respecting Discord 429 responses."""
+    for attempt in range(retries):
+        try:
+            async with session.request(method, url, **kwargs) as response:
+                if response.status == 429:
+                    data = await response.json(content_type=None)
+                    retry_after = float(data.get("retry_after", 2))
+                    warning(f"Discord rate limit: waiting {retry_after:.2f}s")
+                    await asyncio.sleep(retry_after + 0.25)
+                    continue
+
+                if response.status >= 500 and attempt < retries - 1:
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+
+                body = await response.text()
+                try:
+                    payload = await response.json(content_type=None)
+                except Exception:
+                    payload = body
+                return response.status, payload
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            if attempt == retries - 1:
+                error(f"Discord request failed: {type(exc).__name__}: {exc}")
+                return 0, None
+            await asyncio.sleep(1.5 * (attempt + 1))
+
+    return 0, None
+
+
+async def _fetch_emoji_image(session, emoji_id: str, animated: bool):
+    """Download the original emoji from Discord CDN."""
+    extensions = ("gif", "png") if animated else ("png", "webp")
+
+    for ext in extensions:
+        url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+        try:
+            async with session.get(url, allow_redirects=True) as response:
+                if response.status == 200:
+                    data = await response.read()
+                    if data:
+                        return data, ("image/gif" if ext == "gif" else "image/png")
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            continue
+
+    return None, None
+
+
+async def _fetch_all_application_emojis(session, app_id: str):
+    """Fetch the complete application-emoji collection, not just one page."""
+    result = []
+    after = None
+
+    while True:
+        params = {"limit": 200}
+        if after:
+            params["after"] = after
+
+        status, data = await _request_json(
+            session,
+            "GET",
+            f"{API_BASE}/applications/{app_id}/emojis",
+            params=params,
+        )
+        if status != 200:
+            error(f"Failed to fetch application emojis [HTTP {status}]")
+            return result
+
+        items = data.get("items", []) if isinstance(data, dict) else []
+        result.extend(items)
+
+        if len(items) < 200:
+            break
+
+        after = str(items[-1]["id"])
+
+    return result
 
 
 async def run_sync(token: str) -> None:
-    """
-    Async emoji sync. Pass the bot token directly.
-    Respects the EMOJI_SYNC env var — set to "false" to disable.
-    Triggers an automatic restart when emoji.py is patched.
-    """
-    # ── Toggle check ──────────────────────────────────────────────────────────
+    """Synchronize every custom emoji referenced by utils/emoji.py."""
     enabled = os.getenv("EMOJI_SYNC", "true").strip().lower()
     if enabled != "true":
         info(f"Disabled via EMOJI_SYNC={enabled!r} — skipping.")
@@ -87,129 +136,132 @@ async def run_sync(token: str) -> None:
         warning("No token provided — skipping EmojiSync.")
         return
 
-    # ── Read emoji.py ─────────────────────────────────────────────────────────
     try:
-        with open(EMOJI_PY_PATH, "r", encoding="utf-8") as f:
-            content = f.read()
-    except Exception as err:
-        error(f"Could not read emoji.py ({err})")
+        with open(EMOJI_PY_PATH, "r", encoding="utf-8") as file:
+            content = file.read()
+    except Exception as exc:
+        error(f"Could not read emoji.py ({exc})")
         return
 
-    matches = set(re.findall(r"<(a?):(\w+):(\d+)>", content))
+    # Discord custom emoji names are alphanumeric/underscore. Capture both
+    # static <:name:id> and animated <a:name:id> definitions.
+    matches = sorted(set(re.findall(r"<(a?):([A-Za-z0-9_]+):(\d+)>", content)))
     if not matches:
         info("No custom emojis found in emoji.py — nothing to sync.")
         return
 
-    system(f"Starting Application Emoji Sync — {len(matches)} unique emojis found in emoji.py")
+    system(f"Starting Application Emoji Sync — {len(matches)} unique emojis found")
 
     headers = {
         "Authorization": f"Bot {token}",
         "Content-Type": "application/json",
+        "User-Agent": "LightCore-EmojiSync/1.0",
     }
 
-    async with aiohttp.ClientSession(headers=headers) as session:
-        # Fetch bot application ID
-        async with session.get("https://discord.com/api/v10/users/@me") as r:
-            if r.status != 200:
-                error(f"Failed to fetch bot info [HTTP {r.status}]")
-                return
-            app_id = (await r.json()).get("id")
+    timeout = aiohttp.ClientTimeout(total=45)
+    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+        status, bot_data = await _request_json(
+            session, "GET", f"{API_BASE}/users/@me"
+        )
+        if status != 200 or not isinstance(bot_data, dict):
+            error(f"Failed to fetch bot info [HTTP {status}]")
+            return
 
-        # Fetch existing application emojis
-        async with session.get(f"https://discord.com/api/v10/applications/{app_id}/emojis") as r:
-            if r.status != 200:
-                error(f"Failed to fetch application emojis [HTTP {r.status}]")
-                return
-            data = await r.json()
-            app_emojis: list = data.get("items", []) if isinstance(data, dict) else data
+        app_id = bot_data.get("id")
+        if not app_id:
+            error("Discord did not return an application ID.")
+            return
 
+        app_emojis = await _fetch_all_application_emojis(session, app_id)
         info(
-            f"Found {Fore.YELLOW}{len(matches)}{Style.RESET_ALL} templates "
-            f"{Fore.LIGHTBLACK_EX}|{Style.RESET_ALL} "
-            f"Application hosts {Fore.GREEN}{len(app_emojis)}{Style.RESET_ALL} emojis"
+            f"Found {Fore.YELLOW}{len(matches)}{Style.RESET_ALL} source emojis | "
+            f"Application currently has {Fore.GREEN}{len(app_emojis)}{Style.RESET_ALL}"
         )
 
         updated = False
         skipped = uploaded = fixed = failed = 0
 
+        by_id = {str(item.get("id")): item for item in app_emojis}
+        by_name = {item.get("name"): item for item in app_emojis if item.get("name")}
+
         for animated_str, name, old_id in matches:
             animated = animated_str == "a"
-
-            existing = (
-                next((e for e in app_emojis if e["id"] == old_id), None)
-                or next((e for e in app_emojis if e["name"] == name), None)
-            )
+            existing = by_id.get(old_id) or by_name.get(name)
 
             if existing:
-                new_id = existing["id"]
-                if old_id != new_id:
-                    old_str = f"<{animated_str}:{name}:{old_id}>"
-                    new_str = f"<{animated_str}:{existing['name']}:{new_id}>"
-                    content = content.replace(old_str, new_str)
+                new_id = str(existing["id"])
+                new_name = existing.get("name") or name
+
+                if old_id != new_id or name != new_name:
+                    old_token = f"<{animated_str}:{name}:{old_id}>"
+                    new_token = f"<{animated_str}:{new_name}:{new_id}>"
+                    content = content.replace(old_token, new_token)
                     updated = True
                     fixed += 1
-                    warning(f"Auto-fixing ID: {name} {Fore.LIGHTBLACK_EX}-> {new_id}")
+                    warning(f"Repaired {name} -> {new_name}:{new_id}")
                 else:
                     skipped += 1
                 continue
 
-            # Not found — upload it
-            info(f"Uploading: {name} {Fore.LIGHTBLACK_EX}(not in application emojis)")
-
-            image_data = await _fetch_emoji_image(session, old_id, animated)
+            info(f"Uploading missing emoji: {name}")
+            image_data, mime = await _fetch_emoji_image(session, old_id, animated)
             if not image_data:
-                error(f"Could not download image for {name} [ID: {old_id}]")
+                error(f"Could not download source for {name} [ID: {old_id}]")
                 failed += 1
                 continue
 
-            mime = "image/gif" if animated else "image/webp"
-            b64 = base64.b64encode(image_data).decode("utf-8")
-            image_uri = f"data:{mime};base64,{b64}"
+            image_uri = (
+                f"data:{mime};base64,"
+                f"{base64.b64encode(image_data).decode('ascii')}"
+            )
 
-            async with session.post(
-                f"https://discord.com/api/v10/applications/{app_id}/emojis",
+            status, payload = await _request_json(
+                session,
+                "POST",
+                f"{API_BASE}/applications/{app_id}/emojis",
                 json={"name": name, "image": image_uri},
-            ) as r2:
-                if r2.status in (200, 201):
-                    new_emoji = await r2.json()
-                    new_id = new_emoji["id"]
-                    old_str = f"<{animated_str}:{name}:{old_id}>"
-                    new_str = f"<{animated_str}:{new_emoji['name']}:{new_id}>"
-                    content = content.replace(old_str, new_str)
-                    app_emojis.append(new_emoji)
-                    updated = True
-                    uploaded += 1
-                    success(f"Uploaded: {name} {Fore.LIGHTBLACK_EX}[saved as ID: {new_id}]")
-                else:
-                    resp_text = await r2.text()
-                    error(f"Discord rejected {name} -> {resp_text}")
-                    failed += 1
+            )
 
-            # Small delay to respect Discord rate limits
-            await asyncio.sleep(0.5)
+            if status in (200, 201) and isinstance(payload, dict) and payload.get("id"):
+                new_id = str(payload["id"])
+                new_name = payload.get("name") or name
+                by_id[new_id] = payload
+                by_name[new_name] = payload
+                app_emojis.append(payload)
 
-    # ── Write patched emoji.py ────────────────────────────────────────────────
+                old_token = f"<{animated_str}:{name}:{old_id}>"
+                new_token = f"<{animated_str}:{new_name}:{new_id}>"
+                content = content.replace(old_token, new_token)
+                updated = True
+                uploaded += 1
+                success(f"Uploaded {name} -> {new_id}")
+            else:
+                error(f"Discord rejected {name} [HTTP {status}]: {payload}")
+                failed += 1
+
+            # Leave room between writes even when Discord is not rate limiting.
+            await asyncio.sleep(0.35)
+
     if updated:
         try:
-            with open(EMOJI_PY_PATH, "w", encoding="utf-8") as f:
-                f.write(content)
-            success("emoji.py patched in-place to reflect current API state.")
-        except Exception as err:
-            error(f"Could not write patched emoji.py ({err})")
-            updated = False  # don't restart if we couldn't save
+            with open(EMOJI_PY_PATH, "w", encoding="utf-8") as file:
+                file.write(content)
+            success("emoji.py patched with the current application emoji IDs.")
+        except Exception as exc:
+            error(f"Could not write patched emoji.py ({exc})")
+            updated = False
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     parts = []
-    if skipped:  parts.append(f"{Fore.GREEN}{skipped} already matching{Style.RESET_ALL}")
-    if fixed:    parts.append(f"{Fore.YELLOW}{fixed} ID mismatches fixed{Style.RESET_ALL}")
-    if uploaded: parts.append(f"{Fore.CYAN}{uploaded} newly uploaded{Style.RESET_ALL}")
-    if failed:   parts.append(f"{Fore.RED}{failed} failures{Style.RESET_ALL}")
+    if skipped:
+        parts.append(f"{skipped} already matching")
+    if fixed:
+        parts.append(f"{fixed} repaired")
+    if uploaded:
+        parts.append(f"{uploaded} uploaded")
+    if failed:
+        parts.append(f"{failed} failed")
 
-    if parts:
-        system("Sync complete: " + f" {Fore.LIGHTBLACK_EX}|{Style.RESET_ALL} ".join(parts))
-    else:
-        system("Sync complete: nothing to do.")
+    system("Sync complete: " + " | ".join(parts or ["nothing to do"]))
 
-    # ── Auto-restart if emoji.py was changed ─────────────────────────────────
     if updated:
         _restart()
