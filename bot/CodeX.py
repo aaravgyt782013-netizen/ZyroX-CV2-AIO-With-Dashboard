@@ -54,6 +54,8 @@ SERVER_COUNT_CHANNEL_ID = 1419729255977189467  # Replace with your server count 
 USER_COUNT_CHANNEL_ID = 1419729283861184632    # Replace with your user count channel ID
 LOG_CHANNEL_ID = 1396794297386532978 # Replace with the channel ID for join/leave logs
 
+# Prevent duplicate REST sync/background tasks across reconnects.
+_ready_tasks_started = False
 
 client = zyrox()
 tree = client.tree
@@ -103,6 +105,7 @@ async def on_ready():
 
     # on_ready can fire again after reconnect. Only do the expensive
     # REST synchronization and background-task creation once per process.
+    global _ready_tasks_started
     if _ready_tasks_started:
         return
     _ready_tasks_started = True
