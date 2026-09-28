@@ -12,7 +12,7 @@ from .commands.music import Music
 from .commands.music_24_7 import Music247
 from .commands.prefix import Prefix
 from .commands.purge import Purge
-from .commands.automod import Automod
+from .commands.automod_v2 import AutomodV2
 from .commands.automod_listener import AutomodListener
 from .commands.welcome import Welcomer
 from .commands.fun import Fun
@@ -37,7 +37,7 @@ from .commands.autoresponder import AutoResponder
 from .commands.customrole import Customrole
 from .commands.autorole import AutoRole
 from .commands.ticket import TicketCog
-from .commands.logging import Logging
+from .commands.logging_v2 import LoggingV2
 from .commands.translate import TranslateCog
 from .commands.jail import Jail
 from .commands.antinuke import Antinuke
@@ -174,7 +174,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(Music247(bot))
     await bot.add_cog(Prefix(bot))
     await bot.add_cog(Purge(bot))
-    await bot.add_cog(Automod(bot))
+    await bot.add_cog(AutomodV2(bot))
     await bot.add_cog(AutomodListener(bot))
     # Automod event listeners (these enforce the configured rules).
     await bot.add_cog(AntiSpam(bot))
@@ -226,7 +226,7 @@ async def setup(bot: zyrox):
     await bot.add_cog(FilterCog(bot))
     await bot.add_cog(Global(bot))
     await bot.add_cog(TicketCog(bot))
-    await bot.add_cog(Logging(bot))
+    await bot.add_cog(LoggingV2(bot))
     await bot.add_cog(QR(bot))
     await bot.add_cog(VanityRoles(bot))
     await bot.add_cog(ReactionRoles(bot))
