@@ -201,6 +201,28 @@ class Antinuke(commands.Cog):
       await ctx.send(embed=embed)
       return
 
+    if option and option.lower() == "punishment":
+      event = (action or "").lower().strip()
+      value = (punishment or "").lower().strip()
+      allowed_events = {"ban","kick","botadd","channel_create","channel_delete","channel_update","role_create","role_delete","role_update","member_update","guild_update","webhook","prune","everyone"}
+      allowed_values = {"ban","kick","timeout","off"}
+      if event not in allowed_events or value not in allowed_values:
+        return await ctx.send(view=CV2(f"{CROSS} Invalid punishment", "Use: antinuke punishment <event> <ban|kick|timeout|off>"))
+      async with self.db.execute("SELECT punishments FROM antinuke_settings WHERE guild_id = ?", (guild_id,)) as cur:
+        row2 = await cur.fetchone()
+      try:
+        punishments = json.loads(row2[0]) if row2 and row2[0] else {}
+      except Exception:
+        punishments = {}
+      punishments[event] = value
+      if row2:
+        await self.db.execute("UPDATE antinuke_settings SET punishments = ? WHERE guild_id = ?", (json.dumps(punishments), guild_id))
+      else:
+        await self.db.execute("INSERT INTO antinuke_settings (guild_id, whitelist_role_id, log_channel_id, punishments) VALUES (?, NULL, NULL, ?)", (guild_id, json.dumps(punishments)))
+      await self.db.commit()
+      await ctx.send(view=CV2(f"{TICK} Punishment updated", f"{event} is now configured as {value}."))
+      return
+
     if option is None:
       view = CV2(
         f"{ZSAFE} {BRAND_NAME} Security",
