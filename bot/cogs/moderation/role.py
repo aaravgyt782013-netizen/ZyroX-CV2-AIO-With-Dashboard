@@ -125,6 +125,36 @@ class Role(commands.Cog):
         await ctx.send(embed=error)
 
 
+  @role.command(name="add", aliases=["give"], help="Add a role to a member.")
+  @commands.bot_has_permissions(manage_roles=True)
+  @commands.has_permissions(manage_roles=True)
+  @commands.guild_only()
+  async def role_add(self, ctx, member: discord.Member, *, role: discord.Role):
+    if role.is_default() or role.managed or role >= ctx.guild.me.top_role:
+      return await ctx.send(f"{ZWARNING} I can't manage {role.mention}; move my bot role above it.")
+    if ctx.author != ctx.guild.owner and role >= ctx.author.top_role:
+      return await ctx.send(f"{ZWARNING} You can't manage a role at or above your highest role.")
+    try:
+      await member.add_roles(role, reason=f"Role added by {ctx.author} ({ctx.author.id})")
+      await ctx.send(embed=discord.Embed(color=self.color, description=f"Successfully **added** {role.mention} to {member.mention}."))
+    except discord.Forbidden:
+      await ctx.send(f"{ZWARNING} Discord denied the role change. Check my **Manage Roles** permission and role hierarchy.")
+
+  @role.command(name="remove", aliases=["take"], help="Remove a role from a member.")
+  @commands.bot_has_permissions(manage_roles=True)
+  @commands.has_permissions(manage_roles=True)
+  @commands.guild_only()
+  async def role_remove(self, ctx, member: discord.Member, *, role: discord.Role):
+    if role.is_default() or role.managed or role >= ctx.guild.me.top_role:
+      return await ctx.send(f"{ZWARNING} I can't manage {role.mention}; move my bot role above it.")
+    if ctx.author != ctx.guild.owner and role >= ctx.author.top_role:
+      return await ctx.send(f"{ZWARNING} You can't manage a role at or above your highest role.")
+    try:
+      await member.remove_roles(role, reason=f"Role removed by {ctx.author} ({ctx.author.id})")
+      await ctx.send(embed=discord.Embed(color=self.color, description=f"Successfully **removed** {role.mention} from {member.mention}."))
+    except discord.Forbidden:
+      await ctx.send(f"{ZWARNING} Discord denied the role change. Check my **Manage Roles** permission and role hierarchy.")
+
   @role.command(help="Give role to member for particular time")
   @commands.bot_has_permissions(manage_roles=True)
   @blacklist_check()
