@@ -411,10 +411,15 @@ class Music(commands.Cog):
             configs.append((primary_host, primary_port, primary_password, primary_secure, "lightcore-primary"))
 
         configs.extend([
+            # Current public Lavalink v4 fallbacks.
             ("lavalink.jirayu.net", "13592", "youshallnotpass", False, "lightcore-jirayu"),
             ("lavalinkv4.serenetia.com", "80", "https://seretia.link/discord", False, "lightcore-serenetia"),
             ("lava.g3v.co.uk", "9008", "lavalinklol", False, "lightcore-g3v"),
+            ("lavalink.triniumhost.com", "4333", "free", False, "lightcore-trinium-free"),
+            ("lavalink.triniumhost.com", "2333", "kirito", False, "lightcore-trinium-kirito"),
+            ("n3.nexcloud.in", "2026", "nexcloud", False, "lightcore-nexcloud"),
             ("lavav4.minecuta.com", "2333", "discord.gg/gKuXdHs", False, "lightcore-minecuta"),
+            ("lava2.kasawa.pro", "2334", "youshallnotpass", False, "lightcore-kasawa"),
         ])
 
         nodes = []
