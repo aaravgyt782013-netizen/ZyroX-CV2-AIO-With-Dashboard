@@ -129,6 +129,8 @@ class View(LayoutView):
             source_names = []
             if "music" in label_key:
                 source_names = ["Music", "Music247"]
+            elif "security" in label_key or "antinuke" in label_key:
+                source_names = ["Antinuke", "Whitelist", "Unwhitelist", "Extraowner", "Nightmode"]
             elif "embed" in label_key:
                 source_names = ["Embed"]
             elif "voice" in label_key:
